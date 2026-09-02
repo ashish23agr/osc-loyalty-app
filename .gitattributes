@@ -1,0 +1,26 @@
+# Line endings are LF everywhere, in the repository and in the working copy.
+#
+# Why this file exists: a developer machine here had core.autocrlf=true, which
+# rewrites working-copy files to CRLF on checkout. That fights two things this
+# project already enforces - .editorconfig (end_of_line = lf) and Pint's
+# line_ending fixer - so a clone would arrive with files that the formatter
+# immediately wants to change. Setting it here makes the repository the
+# authority instead of whatever each machine happens to be configured with.
+*        text=auto eol=lf
+
+# Files that must never be treated as text. text=auto detects most binaries on
+# content, but being explicit means a corrupted checkout is not one bad guess
+# away - a .wasm mangled by newline translation fails at runtime, not at build.
+*.docx   binary
+*.wasm   binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.webp   binary
+*.ico    binary
+*.pdf    binary
+*.woff   binary
+*.woff2  binary
+*.ttf    binary
+*.otf    binary
