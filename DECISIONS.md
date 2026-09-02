@@ -36,7 +36,8 @@ and the client has been told; silence is then a decision, not a delay.
 - **V4 spike — discount function input readability, 31 Aug 2026**
 - **V6a and V7 mini-spikes — 31 Aug 2026**
 - **Full scope set granted on the development store — 31 Aug 2026**
-- **Live OSC store confirmed on the Shopify Grow plan — our own confirmation, 2 Sep 2026**
+- **Live OSC store confirmed on the Shopify Grow plan — client-confirmed, 2 Sep 2026** (previously our own inference)
+- **Gift-card gate test run manually at checkout on the development store — 2 Sep 2026**
 
 ---
 
@@ -52,11 +53,12 @@ and the client has been told; silence is then a decision, not a delay.
 
 ### What still needs Robert
 
-**One item, and only one:**
+**Two items:**
 
 | Ref | Question | Needed by |
 | --- | --- | --- |
 | **C6 (live)** | Who holds the first Administrator role on the production store? | Go-live |
+| **C14** | Does a Privilege Club voucher reduce the points earned on that order? Our call is yes — spend £550 of a £600 basket, earn 550 points — because the rule is "£1 spent = 1 point" and earning on voucher-paid value compounds loyalty value. Raised 2 Sep 2026 from a live dev-store order. | Before go-live; the code is being corrected to this now |
 
 **C4 is answered.** Confirmed 31 Aug 2026: lapsed members *do* receive the
 birthday voucher, on date of birth alone. It is off this list and out of
@@ -105,9 +107,19 @@ would quietly shorten the usable window to five months.
 **ASSUMED — implemented to the industry-standard default, client notified 27 Aug 2026, pending client objection (not approval).** No longer blocks Sprint 2.
 
 The base is the amount the customer actually pays for qualifying merchandise —
-line-item totals after all discounts, **excluding tax and excluding shipping**,
-rounded down to whole points per order. Including VAT inflates every balance by
-roughly a fifth and would be visible to members immediately as faster accrual.
+line-item totals after all discounts, **excluding tax, excluding shipping, and
+excluding any Privilege Club voucher applied to the order**, rounded down to
+whole points per order. Including VAT inflates every balance by roughly a fifth
+and would be visible to members immediately as faster accrual.
+
+**The voucher counts as a discount — stated explicitly as of 2 Sep 2026, and
+this is our call pending client confirmation.** "After all discounts" was
+already the rule here and was still implemented wrongly (see the change log for
+2 Sep), so it is now spelled out: a member who pays £550 of a £600 basket
+because a £50 voucher covered the rest earns on **£550**. The programme rule is
+"£1 spent = 1 point" and £550 is what they spent. Earning on voucher-paid value
+lets loyalty value earn further loyalty value, which compounds and over-earns
+financially. **On the client-questions list for Robert.**
 
 *How far it is built.* `earn_base` carries `post_discount_ex_tax_ex_shipping` on
 every rule version, is versioned like any other rule, and is listed on the
@@ -808,6 +820,8 @@ none is silently assumed.
 | V9 | Klaviyo API revision and rate limits | `OUTSTANDING` | Sprint 4 |
 | V10 | Store-wide sales figure that reconciles with Shopify analytics | `OUTSTANDING` | Sprint 5 |
 | V11 | Customer account UI extension target and deployability under the legacy install flow | `OUTSTANDING` | Sprint 4 |
+| **V12** | **Earn base on a tax-INCLUSIVE shop: the order of the discount-allocation and tax subtractions** | `OUTSTANDING` — **BLOCKS GO-LIVE** | Before production |
+| **V13** | **Nothing checks that the shop currency and the rules currency agree** — a live defect, found 3 Sep 2026 | `OUTSTANDING` — fix before go-live; not a gate while both are GBP | Sprint 3 tail |
 
 ### V1 — UI layer · `RESOLVED` 2026-08-26, **corrected 2026-08-27**
 
@@ -1054,6 +1068,64 @@ Applied:
 
 ---
 
+### V12 — Earn base on a tax-inclusive shop · `OUTSTANDING` · **blocks go-live**
+
+Raised 2 Sep 2026 while fixing the C14 defect. The earn base is now
+`gross − allocations − tax` when the order is tax-inclusive and
+`gross − allocations` when it is not. **Only the tax-exclusive branch has been
+proved against a real shop.**
+
+*Why it matters and why the dev store cannot answer it.* OSC sells VAT-inclusive,
+so the tax-inclusive branch is the one that ships. The development store is
+`taxesIncluded: false` and paid order `#1002` carried no tax lines at all, so
+nothing has confirmed the arithmetic on the branch that will actually run.
+
+*The specific doubt.* Shopify computes a line's `taxLines` on the amount actually
+charged — after the order-level allocation — whereas `discountedTotalSet`
+excludes that allocation. The two figures are therefore on different bases, and
+subtracting both from `gross` may double-count the tax on the discounted portion.
+Getting it wrong under-pays the member, which is the mirror of the C14 defect and
+just as invisible.
+
+*What would settle it.* Either switch the development store to tax-inclusive
+pricing and re-run a discounted order through A1–A3, or run one such order on
+the live store before launch and reconcile the earn by hand.
+`OrderPayloadMappingTest::test_tax_inclusive_takes_off_both_the_allocation_and_the_tax`
+locks in the current behaviour so a change to it is deliberate; it does not
+vouch for it.
+
+*Status.* On the **go-live checklist** in `PROGRESS.md`, not merely noted.
+
+### V13 — The shop currency and the rules currency are never compared · `OUTSTANDING`
+
+**A live defect, not a validation question.** Found 3 Sep 2026 when the
+development store's base currency changed to EUR mid-session and the app carried
+on as though nothing had happened.
+
+*What happens now.* `AdminApiDiscountCodeWriter::create()` takes `currencyCode`
+from `RuleSet::currency()` and sends an amount; Shopify denominates that amount
+in the **shop's** currency and ignores ours. With rules on GBP and the shop on
+EUR it minted a **€50** voucher for a programme denominated in pounds, with
+`status: ACTIVE` and every other constraint correct — a plausible-looking code
+in the wrong money. At a GBP checkout it would have applied about £43.66.
+
+*Why it is worse than a display bug.* `RedemptionService::pointsFor()` is
+currency-blind: it divides an amount in pence by `voucherValuePence` with no
+notion of which currency those pence are. Confirming that €50 code would have
+spent exactly 1000 points — identical to a £50 one — at whatever the exchange
+rate happened to be. The ledger would balance and the member would be wrong.
+
+*The fix.* The writer should refuse to mint when the shop currency and the rules
+currency disagree, and say so loudly rather than produce a code. Cheap, and it
+would have caught this the moment it happened instead of at a checkout. Worth
+considering whether `pointsFor()` should assert a currency too, rather than
+trusting every caller.
+
+*Exposure.* Low in production while OSC's store and the rules are both GBP, so
+this is not a go-live gate — but the failure mode is silent, which is exactly
+the kind this register exists to stop being rediscovered. **Mine to have missed
+when the writer was written on 2 Sep 2026.**
+
 ## 7. Change log
 
 | Date | Change |
@@ -1096,3 +1168,20 @@ Applied:
 | 2026-08-31 | **D9d built as `confirmed`, not `redeemed`.** `loyalty_redemptions.state` has no `redeemed` value — the enum is `quoted, applied, confirmed, void, reversed` and a paid redemption sits at `confirmed`. `redeemed` belongs to `loyalty_rewards.state`. Recorded so the register matches the column rather than the instruction. |
 | 2026-09-01 | **D7 `CONFIRMED`: `read_all_orders` approved by Shopify.** Requested 27 Aug, granted 1 Sep; the Partner Dashboard reads "Your app can access the full order history for a store". **The backfill job can now be scheduled** — Sprint 4, a one-shot per shop that moves no balance and is safe to re-run. Nothing is unwound and nothing changes today — segmentation continues from our own ledger plus the migrated last-spend date, exactly as designed. What the grant unlocks is the historical backfill that refines `last_qualifying_spend_at` and the segment without moving a single balance. **Approval is not grant:** adding `read_all_orders` to `shopify.app.toml` and `web/.env` forces one further merchant re-authorisation under the legacy install flow, so it is deliberately held until the Sprint 3 dev-store verification run is finished, and is on the go-live checklist. |
 | 2026-09-02 | **D5 `REVISED`: production online redemption moves to the single-use-code path.** The live OSC store is on the **Grow** plan (our own confirmation), and Shopify refuses to activate a function from a custom app below Plus - `"Shop must be on a Shopify Plus plan to activate functions from a custom app."`, returned by `discountAutomaticAppCreate` at test script step A1. The constraint is plan **plus distribution model**, not the legacy install flow, and it was never checked: no mention of Plus, custom-app distribution or plan requirements existed anywhere in the register, the plan or the progress record. `DiscountFunctionGateway` is kept, complete and proven (V4 on real Wasm, V6a verified live at A2), as the Plus-and-above implementation and the future option. A **code-based gateway behind the same `RedemptionGateway` interface is added to Sprint 3**. **POS is unaffected** - D6 uses `applyCartDiscount`, which has no plan requirement. |
+| 2026-09-02 | **"Confirm the OSC live store plan" is answered by the client: Grow**, and the app is a custom app with no public distribution planned. The Plus development-store switch is dropped from the open items and A1 will not be retried against the discount function. **The function path is dropped for production** because Functions-based discounts from a custom app require Plus or public distribution; single-use discount codes created through the Admin API are the Grow-compatible route and work on all plans. `DiscountFunctionGateway` and `extensions/voucher-discount` are kept intact as the Plus-and-above option, not deleted. |
+| 2026-09-02 | **Gift-card gate test run empirically at checkout — the D5 code path is cleared to build, with one residual noted below.** Method: code `GIFTCARDGATE1`, `discountCodeBasicCreate`, $20 fixed amount, `context: {all: ALL}`, `customerGets.items {all: true}`, `usageLimit: 1`, `appliesOncePerCustomer: true`, all `combinesWith` false; node `gid://shopify/DiscountCodeNode/1485398081776`, since deleted. Products: gift card `gid://shopify/Product/10172497789168` variant `gid://shopify/ProductVariant/50160866787568`–`50160866885872`, tested with the $25 variant `gid://shopify/ProductVariant/50160866820336`; ordinary line `gid://shopify/ProductVariant/50160866754800` ($600). **Result 1 — gift-card-only cart: the code is REJECTED by Shopify**, "discount code isn't valid for the items in your cart". A member therefore cannot convert loyalty value into gift-card value on a gift-card-only basket, which was the cash-out hole. **Result 2 — mixed basket** (gift card £25 + snowboard £600, subtotal £625): the code is ACCEPTED and applies as an **order-level** −£20.00, total £605, with the gift-card line still showing £25. **Line-level allocation is NOT verified**: the cart was never paid and no abandoned checkout was created, so no server-side `discountAllocations` record exists and checkout shows only an order-level line. Shopify's own item-validity check is the protection that was demonstrated; per-line allocation on a mixed basket remains unproven. |
+| 2026-09-02 | **Gap found while closing the gift-card gate: the codebase has no gift-card awareness at all.** `grep -rn "isGiftCard\|gift_card"` over `web/app` returns nothing, and `eligible_subtotal_pence` reaches `RedemptionController::store()` from the caller validated only as `integer, min:0`. Gift cards were excluded **solely** by the discount function's own `isGiftCard` input query, so moving to the code path removes that protection and nothing server-side replaces it. Result 2 above means loyalty value can still part-fund a gift card on a mixed basket. Mitigation requires line-level data at quote time, which the current quote API shape does not carry — raised for decision, not assumed. |
+| 2026-09-02 | **Gift-card residual CLOSED empirically: Shopify itself excludes gift-card lines from a fixed-amount code, so NO app-level guard is built.** A real paid order settled what checkout could not show. Order `#1001`, `gid://shopify/Order/7134545019120`, guest checkout (`ashish.agr@yopmail.com`), subtotal £625, code `GIFTCARDGATE2` ($20 fixed amount, `customerGets.items {all: true}`), total £605. The discount application reports `allocationMethod: ACROSS`, `targetType: LINE_ITEM`, `targetSelection: ALL` — i.e. it was offered to every line. **Per-line `discountAllocations`: the snowboard line (`isGiftCard: false`) carries the whole £20.00; the gift-card line (`isGiftCard: true`) carries `[]` — an empty allocation list, `totalDiscountSet` 0.0, `discountedTotalSet` still £25.00.** Loyalty value therefore cannot fund a gift card even on a mixed basket, and the protection is Shopify's own rather than ours to write. Per the 2 Sep direction, the quote contract is NOT extended with line-level data and the POS tile is NOT touched. |
+| 2026-09-02 | **Reading note for anyone re-running that check: `discountAllocations` is the authoritative field, not `totalDiscountSet`.** On order `#1001` the snowboard line shows `totalDiscountSet` 0.0 and `discountedTotalSet` £600.00 while its `discountAllocations` carries £20.00, because an `ACROSS` order-level allocation does not appear in the line's own discount totals. Reading only the totals would say the discount landed nowhere. |
+| 2026-09-02 | **The `orders/paid` path ran on the gate order and correctly posted nothing — verified, not assumed.** `ProcessOrderPaid` fetched order 7134545019120 through `AdminApiOrderSource` at 11:08:16 UTC, and our side holds 0 ledger entries and 0 redemptions for it. **The reason matters and corrects an assumption made when designing the test:** a guest checkout does NOT leave the order without a customer — Shopify created customer `9673034727664` from the email. The earn was skipped because `OrderEarningService::accountFor()` found no `LoyaltyAccount` for that customer, not because the customer id was null. A guest order under an email that IS a member would still earn. |
+| 2026-09-02 | **Deprecation surfaced by the gate order: `Order.physicalLocation` is deprecated on 2026-07.** Raised by the Admin API on every `AdminApiOrderSource::fetch()` call, which selects it. Not touched under the D5 code change (it belongs to the order/earning path, which is out of that change's scope) and recorded here so it is not rediscovered as a failure later. |
+| 2026-09-02 | **D3 restated: the earn base excludes the loyalty voucher as well as VAT and shipping, and `C14` is raised to have the client confirm it.** D3 already read "after all discounts" and the register and the dev-store script already agreed; what was missing was that nobody had written down that a Privilege Club voucher IS one of those discounts, and the implementation did not treat it as one. A member paying £550 of a £600 basket earns 550 points, not 600. **Our call, pending client confirmation — not an assumption the code waits on**, since the alternative over-earns. |
+| 2026-09-02 | **Defect found by dev-store step A3, in the earning path and NOT in the redemption change: the earn base ignores an order-level discount.** On real paid order `#1002` (`gid://shopify/Order/7134863884528`) a £600 line with a £50 voucher earned **600 points on a £600 base** (`qualifying_value_pence` 60000) instead of 550 on £550. Cause: `AdminApiOrderSource.php:158` builds `discounted_total_ex_tax_pence` from the line's `discountedTotalSet`, and **an `ACROSS` order-level allocation never appears in a line's own discount totals** — the line read `originalTotalSet` £600.00, `discountedTotalSet` £600.00, `totalDiscountSet` £0.00, while its `discountAllocations` carried £50.00. This is the same reading trap recorded earlier the same day against order `#1001`, not connected to the earning path at the time. **Pre-existing since Sprint 2 and mechanism-independent** — the discount function allocated `ACROSS` identically, so the code path did not introduce it; the suite missed it because fixtures set `discounted_total_ex_tax_pence` directly and never exercised the Shopify mapping. Fix is scoped as its OWN change, deliberately not folded into the D5 redemption work. |
+| 2026-09-02 | **Dev-store script A1–A4 all PASS on the single-use code path.** A1: code minted as `PC-72347982`, read back from Shopify as `ACTIVE`, `usageLimit 1`, `appliesOncePerCustomer true`, £50.00 GBP, bound to customer `9671675085040`, `endsAt` equal to `quote_expires_at` (14 checks). A2: applied at a logged-in checkout, −£50.00 on a £600 subtotal. A3: paid order `#1002` confirmed the redemption — `state=confirmed`, `points_consumed=1000`, ledger `redemption` entry `pending 0 / available -1000` keyed `redeem:PC-72347982`, balance 1000 → 0, and the order carries `DiscountCodeApplication` with the code, which is the only link between an order and its quote (15 checks). A4: an unused quote swept to `void` with `points_consumed 0`, **no ledger entry**, the member's points untouched, the Shopify code moved `ACTIVE` → `EXPIRED`, and the sweep's own `job.completed` audit row as the record at the C12 grain (8 checks). |
+| 2026-09-02 | **A4 incidentally proved the `QuoteExpirySweep` mechanism-dispatch fix against real data.** The sweep voided two quotes in one run: the new code quote and the stale `PC-97244372` held on 1 Sep through the **function** gateway. Dispatching on `discount_mechanism` rather than channel meant each was withdrawn through the mechanism that actually published it; the previous channel-based dispatch would have tried to clear a metafield for the code quote and deactivate a code for the function quote. |
+| 2026-09-03 | **C14 defect fixed in `AdminApiOrderSource`, as its own change.** The line query now selects `discountAllocations` (it did not — only the order-level `discountApplications` were read, for reference extraction) and `lines()` subtracts the allocated amounts, so the earn base is `gross − allocations` and, on a tax-inclusive order, `gross − allocations − tax`. `fetch()` was split so the payload-to-snapshot mapping is a public seam, `mapOrder()`: **the step that was wrong was the only step no test exercised**, because every fixture built a snapshot or a `lines` array directly. Seven mapping tests added in `tests/Unit/OrderPayloadMappingTest.php` from the real `#1002` payload shape, and **verified by reintroducing the defect — 5 of the 7 fail, on the exact 60000 against 55000 figures.** Suite 445 tests / 2033 assertions, Pint clean. |
+| 2026-09-03 | **Order `#1002` replayed to correct its earn.** `loyalty:replay-orders --order=7134863884528` reported `1 earned (-50 points)`. Earning is cumulative, so it **supersedes by compensation rather than duplicating or editing**: the original `earn` (id 22, `pending 600`, `qualifying_value_pence 60000`) stands and a new `earn_reversal` (id 25, `pending -50`, `parent_entry_id 22`, key `earn:order:7134863884528:t550`) corrects it. **Net earn for the order is 550 points**, member `points_pending` 550, and `loyalty:verify-ledger` reports every cached balance matching. Nothing was deleted — the ledger is append-only and the record of what the member was credited at the time survives. The A3 verification suite re-run at **18/18**. |
+| 2026-09-03 | **V12 raised and put on the go-live checklist: the tax-inclusive earn base is unproven.** The dev store is tax-exclusive and `#1002` had no tax lines, so only `gross − allocations` is empirically verified. OSC sells VAT-inclusive, so the unverified branch is the one that ships. |
+| 2026-09-03 | **The development store's base currency changed from GBP to EUR during tax configuration, which invalidated the V12 run.** `shop.currencyCode` read `GBP` earlier in the session and on order `#1002`; it now reads `EUR`. The £600 snowboard is a €600 product, and the UK market presents it converted — which is the whole explanation for the £524.00 subtotal seen at checkout (€600 × ~0.8733 = £523.98). **It was read as a tax figure and it never was one**; there was no VAT line to find. Suspected cause is the primary market's currency, since the shop baseline follows it, but this is unconfirmed — **check Settings → Markets (which market is Primary, and its currency) and Settings → General (Store currency) before changing anything.** Note Shopify normally refuses to change a base currency once a store has orders, and this one has `#1001` and `#1002`. |
+| 2026-09-03 | **V13 raised: nothing compares the shop currency with the rules currency**, so a €50 voucher was minted for a GBP programme with every other constraint correct. `pointsFor()` is currency-blind, so confirming it would have spent 1000 points regardless. Quote `PC-40690629` was voided unused rather than applied. See the V13 entry. |
+| 2026-09-03 | **V12 remains OUTSTANDING and gated — not settled tonight.** UK VAT collection was enabled successfully (Settings → Taxes and duties → Regional settings → United Kingdom → Collect VAT) and the market's **Tax display** was already set to `Dynamic tax display`, so step 2 changed nothing — the missing piece had been collection, and `#1002` had neither collection nor a UK destination. The run was then stopped by the currency finding above rather than by anything in the code. **V12's alternative route stands: reconcile one real discounted order on the live store before launch.** Dev-store state left as: UK VAT collecting, tax display Dynamic, base currency EUR, gift card variants stocked and sellable. |

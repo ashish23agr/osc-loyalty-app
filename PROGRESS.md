@@ -111,13 +111,41 @@ The shape of the work, from reading the seam:
   to the whole order. Harmless under the launch rules (`mode: all`), a real gap
   the day OSC configures an exclusion.
 
+### D5 code path built — 2 Sep 2026
+
+The single-use discount code gateway is written and green; nothing is released.
+
+- **New:** `DiscountCodeWriter` + `AdminApiDiscountCodeWriter`
+  (`discountCodeBasicCreate` / `discountCodeDeactivate`), `DiscountCodeGateway`,
+  one additive migration extending `discount_mechanism` with `discount_code`,
+  `FakeDiscountCodeWriter`, and `DiscountCodeRedemptionTest` (12 tests).
+- **The online mechanism is now chosen in exactly one place** — the
+  `RedemptionGateway` binding in `AppServiceProvider`. `RedemptionController`
+  had the choice duplicated in `store()` and `destroy()`; both now go through
+  one `gatewayFor()`.
+- **A real bug fell out of it.** `QuoteExpirySweep` chose its gateway by
+  **channel**, so once the online binding changed it would have withdrawn a
+  function-published quote through the code gateway — clearing a metafield that
+  was never written and leaving a live code standing. It now dispatches on the
+  redemption's recorded `discount_mechanism`, which is what that column is for.
+  Two existing tests caught it and needed no edits.
+- **The code's `endsAt` is the quote's `quote_expires_at`**, so Shopify and the
+  expiry sweep cannot disagree about whether an offer still stands.
+- **No gift-card guard, and that is evidence-based** — see the 2 Sep register
+  rows for paid order `#1001`.
+- **No new command and no new schedule entry:** `eachShop()` already writes the
+  C12 per-run audit entry, so an expired code needs no ledger row and no
+  per-quote audit row.
+- Backend **438 tests / 2026 assertions**. The new migration is verified on
+  **MySQL 8.4** as well as SQLite: the column reads
+  `enum('function','pos_cart_discount','discount_code')`, still NOT NULL, and
+  still refuses an unknown value.
+- `docs/DEV_STORE_TEST_SCRIPT.md` section A is rewritten as A1–A4 for the code
+  flow; the old A1–A5 metafield steps are gone.
+
 ### On your side
 
-1. **Switch the dev store to a Shopify Plus development plan** — Partner
-   Dashboard → Stores → `loyalty-system` → development-store plan. Free and
-   reversible. Unblocks A1 and the function path. It does **not** change D5:
-   the live store is on Grow, so the code path is still what ships.
-2. **Step B on the iPad** — moved to the morning of 3 Sep 2026. Member details
+1. **Step B on the iPad** — moved to the morning of 3 Sep 2026. Member details
    are in the A3 row above; card number **`0000-0010`**. After *Apply*, the check
    is `shopify_location_id` (must be a number, not NULL) and `staff_reference`.
 
@@ -1042,6 +1070,7 @@ Nothing of Sprint 2 remains. Carried forward:
 | Item | Owner |
 | --- | --- |
 | **The cron entry, a queue worker, and the scope grant** | Deployment — code cannot supply these. On the go-live checklist and in the README |
+| **V12 — prove the earn base on a tax-INCLUSIVE shop** | **GO-LIVE BLOCKER, added 3 Sep 2026.** The earn base subtracts both the discount allocation and tax when an order is tax-inclusive, and **only the tax-exclusive branch is proved** — the dev store is `taxesIncluded: false` and order `#1002` had no tax lines. OSC sells VAT-inclusive, so the unproved branch is the one that ships. Settle it by switching the dev store to tax-inclusive pricing and re-running a discounted order through A1–A3, or by reconciling one real discounted order by hand before launch. See V12 in `DECISIONS.md` |
 | V2 volume pass | Seed to a two-year row count and confirm the sweep and report queries stay indexed. Sprint 5 at the latest |
 | Location *names* on ledger rows | Needs a `read_locations` lookup and a cache. Only the id is held today |
 | Sprint 2 console extras from the plan's frontend track | Adjustment and reward actions beyond A4, the staff roles screen. The audit viewer and job health are built |

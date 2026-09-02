@@ -6,7 +6,7 @@ these are the ones that need a real cart.
 
 | # | What it proves | Why code cannot |
 | --- | --- | --- |
-| A | The entitlement metafield is visible to the discount function at cart time | The spike proved the field is *selectable* and that compiled Wasm reads a fixture. Only a live cart proves Shopify actually populates it from a `metafieldsSet` write |
+| A | A single-use discount code carries a redemption from quote to spent points | The suite fakes the writer, so only a real shop proves Shopify mints the code with the constraints we never re-check, and that the code survives onto the paid order as the reference `orders/paid` reads |
 | B | POS populates `cart.retailLocation` | Same: readable in the schema, shaped in fixtures, never seen from a real till |
 | C | One end-to-end redemption posts through the ledger with the reference on the receipt | The chain crosses four systems (tile → app → POS cart → order webhook → ledger) and nothing but a real sale exercises all of it |
 
@@ -18,22 +18,31 @@ these are the ones that need a real cart.
 # 1. Terminal one — the tunnel and the app. Leave this running.
 shopify app dev
 
-# 2. Terminal two — the queue worker. Nothing earns without it.
+# 2. Terminal two — the queue worker. Nothing earns and nothing is
+#    confirmed without it: orders/paid is acknowledged fast and queued.
 cd web && php artisan queue:work --tries=5
 
-# 3. Terminal three — for the checks below.
+# 3. Terminal three — the scheduler, for A4 only.
+#    The quote expiry sweep is NOT queued: it runs synchronously inside the
+#    scheduler process, so the queue worker above will never run it, and
+#    nothing on a dev machine runs it unless this is up. A4 can also force it
+#    by hand, in which case skip this terminal.
+cd web && php artisan schedule:work
+
+# 4. Terminal four — for the checks below.
 cd web
 ```
 
-**Re-authorise once.** `write_products` was added for V6a after the last grant.
-Open the app in the dev store admin and accept the prompt. Confirm:
+**Scopes.** The code path needs `write_discounts` and `read_discounts`, both
+granted. Confirm, and note the list is Shopify's collapsed form where each
+`write_*` implies its `read_*`:
 
 ```bash
 php artisan tinker --execute="echo App\Models\Session::first()->scope;"
 ```
 
-Expect `write_products` in the list. If it is absent, the sync in step A2 will
-write nothing and step A will fail for the wrong reason.
+Expect `write_discounts` present. If it is absent, A1 fails at the mint and
+`storage/logs/laravel.log` will say so.
 
 **Register the webhooks** (they follow the tunnel URL, which `shopify app dev`
 has just changed):
@@ -47,11 +56,33 @@ Expect `orders/paid`, `orders/updated`, `orders/cancelled`, `refunds/create`.
 
 ---
 
-## A. The entitlement metafield is visible to the function
+## A. The single-use discount code, end to end
 
-### A1 — Create the discount, once
+**Replaces the old A entirely.** A1-A5 tested the discount function reading a
+customer metafield. That path is not what ships: Shopify refuses to activate a
+function from a custom app below Plus and the live OSC store is on Grow (D5,
+revised 2 Sep 2026). The function gateway is kept as the Plus-and-above option
+and has its own tests; what needs a real shop is the code path.
 
-The function needs an automatic app discount to exist before it runs at all.
+The member from the earlier run is reused rather than created again: **account id
+10**, customer `9671675085040`, `ashish.agrawal@dotsquares.com`, 1000 points =
+`voucher_balance_pence` 5000.
+
+**Two synthetic ledger entries on this account are deliberate, not defects.**
+Both are dev-store scaffolding and neither should be "corrected" by anyone
+reading the ledger later:
+
+| Key | What it is |
+| --- | --- |
+| `devstore:open:10` | The original 1000-point balance created for the first run |
+| `devstore:a4-topup:10` | A further 1000 points added 2 Sep 2026, because A3 spends the whole balance and A4 needs something left to quote against. Kept on purpose so this script can be re-run |
+
+There is also a real correction on this account, which IS meaningful: an
+`earn_reversal` of `-50` against order `#1002`, parented to earn id 22. That is
+the C14 fix being applied by replay, and the net earn for that order is 550
+points rather than 600. See the 3 Sep 2026 change-log rows in `DECISIONS.md`.
+
+### A1 - hold a quote, and see the code appear on Shopify
 
 ```bash
 php artisan tinker
@@ -59,109 +90,149 @@ php artisan tinker
 
 ```php
 $shop = 'loyalty-system.myshopify.com';
-App\Services\ShopifyAdminApi::forShop($shop)->query(<<<'GQL'
-mutation { discountAutomaticAppCreate(automaticAppDiscount: {
-  title: "Privilege Club voucher"
-  functionHandle: "voucher-discount"
-  startsAt: "2026-01-01T00:00:00Z"
-  discountClasses: [ORDER]
-  combinesWith: { orderDiscounts: true, productDiscounts: true, shippingDiscounts: true }
-}) { automaticAppDiscount { discountId status } userErrors { field message code } } }
-GQL);
-```
+$member = App\Models\LoyaltyAccount::where('shop_domain', $shop)->findOrFail(10);
 
-**Expect** `status: ACTIVE` and `userErrors: []`.
-**If `userErrors` mentions scopes**, the re-authorisation above did not take.
-
-### A2 — Sync the exclusion flags
-
-```bash
-php artisan loyalty:sync-exclusions
-```
-
-**Expect** a line like
-`loyalty-system.myshopify.com (rules v1) — 12 product(s) · 0 excluded / 12 included · 12 flag(s) written · shop config written`.
-
-**If it says `SHOP CONFIG NOT WRITTEN`**, note it and carry on — that is the one
-thing V6a flagged as unverified, and the function treats an absent shop config as
-"enabled", so the rest of the script still works. **Tell me if you see it.**
-
-### A3 — Give a member some voucher value
-
-In the dev store admin, pick a customer with an email you can log in as. Note
-their customer id from the URL.
-
-```php
-// tinker
-$shop = 'loyalty-system.myshopify.com';
-$member = App\Models\LoyaltyAccount::create([
-    'shop_domain' => $shop,
-    'shopify_customer_id' => <CUSTOMER_ID>,
-    'email' => '<their email>',
-    'first_name' => 'Test', 'last_name' => 'Member',
-    'enrolment_channel' => 'admin', 'enrolled_at' => now(),
-]);
-
-app(App\Domain\Loyalty\LedgerService::class)->post($member,
-    App\Domain\Loyalty\LedgerPosting::openingBalance(
-        points: 1000, idempotencyKey: 'devstore:open:'.$member->id,
-        occurredAt: now()->subMonth(), expiresAt: now()->addMonths(5),
-        reason: 'Dev store test balance',
-    ));
-
-$member->refresh()->voucher_balance_pence;   // expect 5000
-```
-
-### A4 — Hold a quote, which publishes the metafield
-
-```php
-// tinker, continuing
 $held = app(App\Domain\Redemption\RedemptionService::class)->hold(
-    account: $member->refresh(),
-    gateway: app(App\Domain\Redemption\DiscountFunctionGateway::class),
+    account: $member,
+    // The container decides the online mechanism. Resolving the interface is
+    // the point: if this returns the function gateway, the binding is wrong.
+    gateway: app(App\Domain\Redemption\RedemptionGateway::class),
     eligibleSubtotalPence: 6000,
     basketTotalPence: 10000,
     channel: 'online',
 );
-$held['redemption']->reference;      // note this down — call it REF
-$held['redemption']->amount_pence;   // expect 5000
+
+$r = $held['redemption'];
+[$r->reference, $r->amount_pence, $r->discount_mechanism, $r->shopify_discount_gid];
 ```
 
-Confirm Shopify actually stored it:
+**Expect** `discount_mechanism` of `discount_code`, `amount_pence` 5000, and a
+non-null `shopify_discount_gid`. Note the reference - call it **REF**.
+
+**If `shopify_discount_gid` is null** the mint failed and the quote has nothing
+to apply. `storage/logs/laravel.log` carries the reason; a duplicate code or a
+missing `write_discounts` grant are the likely ones.
+
+Now read it back from Shopify, which is the half no test can reach:
 
 ```php
 App\Services\ShopifyAdminApi::forShop($shop)->query(<<<'GQL'
-query { customer(id: "gid://shopify/Customer/<CUSTOMER_ID>") {
-  metafield(key: "voucher") { namespace key jsonValue } } }
+query { codeDiscountNodeByCode(code: "REF_GOES_HERE") {
+  codeDiscount { ... on DiscountCodeBasic {
+    title status usageLimit appliesOncePerCustomer startsAt endsAt
+    codes(first: 1) { nodes { code } }
+    customerGets { value { ... on DiscountAmount { amount { amount currencyCode } } } }
+  } }
+} }
 GQL);
 ```
 
-**Expect** a `jsonValue` containing `voucher_balance_pence: 5000` and your REF,
-and a `namespace` beginning `app--`. **The `app--` prefix is the point** — it is
-the app-reserved namespace, which is why the function may trust it.
+**Expect** `status: ACTIVE`, `usageLimit: 1`, `appliesOncePerCustomer: true`, the
+amount 50.00 GBP, `endsAt` equal to the quote's `quote_expires_at`, and the code
+equal to REF. **These are the constraints the app deliberately does not
+re-check**, so this read is the only thing standing behind them.
 
-### A5 — The actual proof: put it in a cart
+### A2 - apply it at checkout
 
-1. Open the dev store **storefront** and **log in as that customer**. This
-   matters: the function reads `buyerIdentity.isAuthenticated`, and a guest
-   checkout is designed to get nothing.
-2. Add **£100 of ordinary products** (not gift cards).
-3. Go to checkout — do **not** pay yet.
+1. Open the dev store **storefront** and **log in as that customer**. The code is
+   bound to them: a guest or a different customer must be refused, and that
+   refusal is a pass, not a failure.
+2. Add **GBP 100 of ordinary products** (not gift cards).
+3. At checkout, enter **REF** in the discount field.
 
-**✅ A passes if** the order summary shows a discount line reading
-**`Privilege Club £50 (REF)`**.
+**A2 passes if** the order summary shows a discount line of **GBP 50.00**
+carrying REF.
 
-**If no discount appears**, in order of likelihood:
+**Worth trying deliberately, both are quick:** enter REF while logged out or as
+another customer, and confirm it is refused. That is the customer binding doing
+the only job that protects it, since REF is printed on receipts and is not a
+secret.
 
-| Check | How |
-| --- | --- |
-| Are you logged in, not a guest? | The account menu shows the customer's name |
-| Did the discount get created? | A1 returned `status: ACTIVE` |
-| Is the function deployed? | `shopify app dev` is running and shows the extension |
-| Did the metafield write? | A4's query returned a `jsonValue` |
+### A3 - pay, and watch the points leave the ledger
 
-Please **screenshot the checkout summary** either way.
+1. **Take payment** (Bogus Gateway).
+2. Wait a few seconds for the queue worker to pick up `orders/paid`.
 
+```bash
+php artisan tinker --execute="
+\$r = App\Models\Redemption::latest('id')->first();
+echo 'ref=', \$r->reference, ' state=', \$r->state,
+     ' points_consumed=', \$r->points_consumed,
+     ' order=', var_export(\$r->shopify_order_id, true), PHP_EOL;"
+```
+
+**Expect** `state=confirmed`, `points_consumed=1000`, and the order id set.
+
+```bash
+php artisan tinker --execute="
+\$e = App\Models\LedgerEntry::whereIn('entry_type',['earn','redemption'])->latest('id')->take(5)->get();
+foreach (\$e as \$x) { echo \$x->entry_type, ' pending=', \$x->pending_delta,
+  ' available=', \$x->available_delta, ' key=', \$x->idempotency_key, PHP_EOL; }"
+```
+
+**A3 passes if you see both:**
+
+- a `redemption` entry with `pending=0`, `available=-1000` and
+  `key=redeem:REF`, and
+- an `earn` entry with `pending=` the qualifying spend in points, net of the
+  voucher and ex VAT and shipping (D3).
+
+Then:
+
+```bash
+php artisan loyalty:verify-ledger     # expect: every cached balance matches
+```
+
+**If `state` is still `quoted`**, the code did not survive onto the order as a
+readable code. That is the interesting failure, because the code is the *only*
+link between a paid order and the quote behind it. Check what the order carries:
+
+```php
+App\Services\ShopifyAdminApi::forShop('loyalty-system.myshopify.com')->query(<<<'GQL'
+query { order(id: "gid://shopify/Order/<ORDER_ID>") {
+  discountApplications(first: 10) { nodes { __typename
+    ... on DiscountCodeApplication { code } } } } }
+GQL);
+```
+
+**Expect** `code` equal to REF. If the code is there and the state is still
+`quoted`, send me the exact value.
+
+### A4 - the quote expiry sweep retires an unused code
+
+Points were never deducted at generation, so an unused code costs the member
+nothing. What must happen is that the offer stops standing.
+
+```bash
+php artisan tinker --execute="
+\$m = App\Models\LoyaltyAccount::findOrFail(10);
+\$h = app(App\Domain\Redemption\RedemptionService::class)->hold(
+  account: \$m, gateway: app(App\Domain\Redemption\RedemptionGateway::class),
+  eligibleSubtotalPence: 6000, basketTotalPence: 10000, channel: 'online');
+echo 'held ', \$h['redemption']->reference, ' gid=', \$h['redemption']->shopify_discount_gid, PHP_EOL;"
+```
+
+Wait for the sweep, or force it:
+
+```bash
+php artisan loyalty:expire-quotes --as-of="+30 minutes"
+```
+
+```bash
+php artisan tinker --execute="
+\$r = App\Models\Redemption::latest('id')->first();
+echo 'state=', \$r->state, ' points_consumed=', \$r->points_consumed, PHP_EOL;"
+```
+
+**A4 passes if** `state=void`, `points_consumed=0`, **no ledger entry was
+written for it** (the sweep's own `job.completed` audit entry is the record, at
+the C12 grain of one entry per run), and the code reads back from Shopify as no
+longer active.
+
+**Note there is no gift-card step.** It was run on 2 Sep 2026 and closed:
+Shopify excludes gift-card lines from a fixed-amount code itself, proved on paid
+order `#1001` where the gift-card line came back with an empty
+`discountAllocations`. There is no app-level behaviour left to test.
 ---
 
 ## B. POS populates `retailLocation`
@@ -287,13 +358,17 @@ echo App\Models\LedgerEntry::where('entry_type','earn')->latest('id')->first()?-
 
 ## What to send back
 
-1. Screenshot of the **checkout summary** from A5 (discount line, or its absence).
-2. The `namespace` value from A4 — confirming the `app--` prefix.
-3. The `location=` / `staff=` line from B.
-4. Photo or screenshot of the **receipt** discount line from C.
-5. The ledger entries and `state=` from C.
-6. Whether A2 said `shop config written` or `SHOP CONFIG NOT WRITTEN`.
-7. Anything in the queue worker's output that looks like a warning.
+1. The `codeDiscountNodeByCode` read from **A1** - status, `usageLimit`,
+   `appliesOncePerCustomer`, amount and `endsAt`.
+2. Screenshot of the **checkout summary** from A2 showing the GBP 50.00 line with
+   REF, and what happened when you tried REF as another customer or logged out.
+3. The `state` / `points_consumed` line and the two ledger entries from **A3**.
+4. The `state=void` line from **A4**, and whether any ledger entry appeared
+   against it (there should be none).
+5. The `location=` / `staff=` line from **B**.
+6. Photo or screenshot of the **receipt** discount line from **C**.
+7. The ledger entries and `state=` from **C**.
+8. Anything in the queue worker's output that looks like a warning.
 
 Any of A, B or C failing tells us something the schema could not, which is the
 whole reason for running it by hand.
