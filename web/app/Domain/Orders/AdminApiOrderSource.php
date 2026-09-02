@@ -51,6 +51,15 @@ final class AdminApiOrderSource implements OrderSource
             id
             currentQuantity
             discountedTotalSet { shopMoney { amount currencyCode } }
+            # Order-level discounts do NOT appear in discountedTotalSet. An
+            # allocation with allocationMethod ACROSS - which is what a
+            # fixed-amount code and an automatic app discount both produce -
+            # leaves the line's own discountedTotalSet and totalDiscountSet
+            # untouched and shows up only here. Reading the totals alone
+            # earned points on voucher-paid value (order #1002, 2 Sep 2026).
+            discountAllocations {
+              allocatedAmountSet { shopMoney { amount } }
+            }
             taxLines { priceSet { shopMoney { amount } } }
             product {
               id
@@ -98,6 +107,24 @@ final class AdminApiOrderSource implements OrderSource
             return null;
         }
 
+        return self::mapOrder($shopifyOrderId, $order);
+    }
+
+    /**
+     * Turn a raw Shopify order payload into a snapshot.
+     *
+     * **Separated from `fetch()` so it can be tested at all**, and that is not
+     * housekeeping. The earn base was read from the wrong field for the whole
+     * of Sprint 2 and no test could see it: every fixture built an
+     * `OrderSnapshot` (or its `lines` array) directly, so the step that was
+     * actually wrong — Shopify's payload becoming our numbers — was the one
+     * step nothing exercised. A fixture that starts from a real payload shape
+     * is the only kind that can catch it, and it needs this seam.
+     *
+     * @param  array<string, mixed>  $order  A payload shaped like ORDER_QUERY's response.
+     */
+    public static function mapOrder(int $shopifyOrderId, array $order): OrderSnapshot
+    {
         $taxesIncluded = (bool) ($order['taxesIncluded'] ?? false);
 
         return new OrderSnapshot(
@@ -151,11 +178,32 @@ final class AdminApiOrderSource implements OrderSource
                 $tax += self::pence($taxLine['priceSet']['shopMoney']['amount'] ?? '0');
             }
 
+            // Order-level discounts, which discountedTotalSet does not carry.
+            // D3's base is "after all discounts", and a Privilege Club voucher
+            // is one of them (C14): a member paying GBP 550 of a GBP 600 basket
+            // earns on 550, or loyalty value earns further loyalty value.
+            $allocated = 0;
+
+            foreach ($node['discountAllocations'] ?? [] as $allocation) {
+                $allocated += self::pence($allocation['allocatedAmountSet']['shopMoney']['amount'] ?? '0');
+            }
+
             $lines[] = [
                 'id' => (string) ($node['id'] ?? ''),
                 // D3's base. When the shop sells tax-exclusive the discounted
                 // total is already net, and subtracting again would under-pay.
-                'discounted_total_ex_tax_pence' => $taxesIncluded ? max(0, $gross - $tax) : $gross,
+                //
+                // UNVERIFIED on the tax-inclusive branch, and it is the branch
+                // that will ship: OSC sells VAT-inclusive, while the dev store
+                // is tax-exclusive and order #1002 carried no tax lines at all.
+                // Shopify computes taxLines on the amount actually charged
+                // (post-allocation) whereas discountedTotalSet excludes the
+                // allocation, so the two are on different bases and the order
+                // of these subtractions needs proving on a tax-inclusive shop
+                // before go-live. See V12 in DECISIONS.md.
+                'discounted_total_ex_tax_pence' => $taxesIncluded
+                    ? max(0, $gross - $allocated - $tax)
+                    : max(0, $gross - $allocated),
                 'current_quantity' => (int) ($node['currentQuantity'] ?? 0),
                 'tags' => array_map('strval', $node['product']['tags'] ?? []),
                 'collections' => array_map(
