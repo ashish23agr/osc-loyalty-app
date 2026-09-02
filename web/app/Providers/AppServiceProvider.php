@@ -25,14 +25,18 @@ use App\Domain\Loyalty\RefundReversalService;
 use App\Domain\Loyalty\SegmentSweep;
 use App\Domain\Orders\AdminApiOrderSource;
 use App\Domain\Orders\OrderSource;
+use App\Domain\Redemption\AdminApiDiscountCodeWriter;
 use App\Domain\Redemption\AdminApiMetafieldWriter;
 use App\Domain\Redemption\AdminApiProductCatalogue;
+use App\Domain\Redemption\DiscountCodeGateway;
+use App\Domain\Redemption\DiscountCodeWriter;
 use App\Domain\Redemption\DiscountFunctionGateway;
 use App\Domain\Redemption\ExclusionSync;
 use App\Domain\Redemption\MetafieldWriter;
 use App\Domain\Redemption\PosCartDiscountGateway;
 use App\Domain\Redemption\ProductCatalogue;
 use App\Domain\Redemption\QuoteExpirySweep;
+use App\Domain\Redemption\RedemptionGateway;
 use App\Domain\Redemption\RedemptionService;
 use App\Domain\Rules\RulesVersionRepository;
 use App\Http\Presenters\MemberPresenter;
@@ -92,11 +96,26 @@ class AppServiceProvider extends ServiceProvider
         // supply orders from elsewhere, not because the scope is in doubt.
         $this->app->singleton(OrderSource::class, AdminApiOrderSource::class);
 
-        // Sprint 3. The gateway is bound to the discount function (D5); the
-        // POS tile resolves its own. Keeping the mechanism behind the interface
-        // is what kept the single-use-code alternative available while D5 was
-        // still a spike.
+        // Sprint 3. **This binding is the online redemption mechanism, and it is
+        // the only place it is chosen.** Resolve `RedemptionGateway` to mean
+        // "however this shop redeems online"; the POS tile resolves
+        // `PosCartDiscountGateway` explicitly because the till is a different
+        // mechanism, not a configurable one.
+        //
+        // D5 revised 2 Sep 2026: the code path ships, because Shopify refuses a
+        // function from a custom app below Plus and the live store is on Grow.
+        // Keeping the mechanism behind the interface is what made that a
+        // one-line change here rather than a rewrite — swap this back to
+        // DiscountFunctionGateway and the function path returns intact.
+        $this->app->singleton(RedemptionGateway::class, DiscountCodeGateway::class);
+
+        $this->app->singleton(DiscountCodeWriter::class, AdminApiDiscountCodeWriter::class);
+        $this->app->singleton(DiscountCodeGateway::class);
+
         $this->app->singleton(MetafieldWriter::class, AdminApiMetafieldWriter::class);
+
+        // Kept, not retired: the Plus-and-above implementation, proven by the V4
+        // and V6a spikes, and still exercised by its own tests.
         $this->app->singleton(DiscountFunctionGateway::class);
         $this->app->singleton(RedemptionService::class);
         $this->app->singleton(ProductCatalogue::class, AdminApiProductCatalogue::class);

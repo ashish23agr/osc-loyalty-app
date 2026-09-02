@@ -14,13 +14,17 @@ use Illuminate\Support\Carbon;
  * ended one were a confirmation or an explicit void, so `quote_expires_at` was a
  * promise nothing kept.
  *
- * **Why it matters, and it is not tidiness.** Holding a quote publishes an
- * entitlement the discount function can read. If the member's points expire
- * overnight while that entitlement is still readable, the function would still
- * offer the old amount and confirming it would spend points the member no longer
- * has — driving the balance negative. Q3 permits a negative balance from a
- * *clawback*; a redemption creating one is a different thing and is not
- * intended.
+ * **Why it matters, and it is not tidiness.** Holding a quote publishes value
+ * the channel can apply — an app-owned metafield under the function, a live
+ * single-use discount code under D5 as revised. If the member's points expire
+ * overnight while that offer still stands, the channel would still apply the old
+ * amount and confirming it would spend points the member no longer has — driving
+ * the balance negative. Q3 permits a negative balance from a *clawback*; a
+ * redemption creating one is a different thing and is not intended.
+ *
+ * Under the code path the offer is Shopify's to hold, not ours, which makes this
+ * sweep the only thing that ends it early: a code carries its own `endsAt`, but
+ * a quote voided before that still has a live code until this runs.
  *
  * **What an expired quote does, which was a choice.** It is voided and the
  * published entitlement is withdrawn. Nothing is re-quoted: both channels ask
@@ -33,7 +37,8 @@ final class QuoteExpirySweep
 {
     public function __construct(
         private readonly RedemptionService $redemptions,
-        private readonly DiscountFunctionGateway $online,
+        private readonly DiscountCodeGateway $code,
+        private readonly DiscountFunctionGateway $function,
         private readonly PosCartDiscountGateway $pos,
     ) {}
 
@@ -84,8 +89,29 @@ final class QuoteExpirySweep
         ];
     }
 
+    /**
+     * Withdraw through the mechanism that published, not the one in force now.
+     *
+     * **This dispatches on `discount_mechanism`, deliberately, and not on
+     * channel.** The column records what actually published this quote, and the
+     * online mechanism has already changed once — D5 moved from the discount
+     * function to single-use codes on 2 Sep 2026. A sweep that chose by channel
+     * would take the *current* online gateway to a quote published by the
+     * previous one: it would clear a metafield that was never written and leave
+     * a live discount code standing, or the reverse. Either way the member keeps
+     * an offer nothing will take back, which is the exact failure this sweep
+     * exists to prevent.
+     *
+     * An unrecognised or missing mechanism falls back to the channel, because a
+     * best-effort withdrawal beats none — but that is a fallback, not the path.
+     */
     private function gatewayFor(Redemption $quote): RedemptionGateway
     {
-        return $quote->channel === 'pos' ? $this->pos : $this->online;
+        return match ($quote->discount_mechanism) {
+            'discount_code' => $this->code,
+            'function' => $this->function,
+            'pos_cart_discount' => $this->pos,
+            default => $quote->channel === 'pos' ? $this->pos : $this->code,
+        };
     }
 }

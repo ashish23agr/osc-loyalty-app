@@ -5,11 +5,13 @@ namespace Tests\Feature\Admin;
 use App\Domain\Loyalty\LedgerPosting;
 use App\Domain\Loyalty\LedgerService;
 use App\Domain\Loyalty\RedemptionLadder;
+use App\Domain\Redemption\DiscountCodeWriter;
 use App\Domain\Redemption\MetafieldWriter;
 use App\Models\AuditEntry;
 use App\Models\LedgerEntry;
 use App\Models\LoyaltyAccount;
 use App\Models\Redemption;
+use Tests\Support\FakeDiscountCodeWriter;
 use Tests\Support\FakeMetafieldWriter;
 
 /**
@@ -24,12 +26,19 @@ class RedemptionEndpointTest extends AdminApiTestCase
 {
     private FakeMetafieldWriter $metafields;
 
+    private FakeDiscountCodeWriter $codes;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->metafields = new FakeMetafieldWriter;
         $this->app->instance(MetafieldWriter::class, $this->metafields);
+
+        // Both writers are faked, so a test can assert not only that the right
+        // mechanism published but that the other one did not.
+        $this->codes = new FakeDiscountCodeWriter;
+        $this->app->instance(DiscountCodeWriter::class, $this->codes);
     }
 
     /** A member holding £50 of voucher value. */
@@ -160,8 +169,8 @@ class RedemptionEndpointTest extends AdminApiTestCase
         $this->assertSame(1000, $member->refresh()->points_available);
     }
 
-    /** POS holds publish nothing — the tile applies the discount itself (D6). */
-    public function test_a_till_hold_publishes_no_customer_metafield(): void
+    /** POS holds publish nothing at all — the tile applies the discount itself (D6). */
+    public function test_a_till_hold_publishes_nothing(): void
     {
         $member = $this->holder();
 
@@ -173,10 +182,18 @@ class RedemptionEndpointTest extends AdminApiTestCase
         ], $this->headersFor('agent', 810002))->assertStatus(201);
 
         $this->assertSame([], $this->metafields->written);
+        $this->assertSame([], $this->codes->created);
     }
 
-    /** Online holds do publish, because the function has to read it (D5). */
-    public function test_an_online_hold_publishes_the_entitlement(): void
+    /**
+     * An online hold mints a single-use code (D5 as revised, 2 Sep 2026).
+     *
+     * The constraints asserted here are the ones Shopify enforces and the app
+     * therefore does NOT re-check — so if they are minted wrong, nothing else in
+     * the system will notice. That is the whole reason this test reads the
+     * payload rather than just counting calls.
+     */
+    public function test_an_online_hold_mints_a_single_use_code_for_that_customer(): void
     {
         $member = $this->holder();
 
@@ -187,10 +204,34 @@ class RedemptionEndpointTest extends AdminApiTestCase
             'channel' => 'online',
         ], $this->headersFor('agent', 810002))->assertStatus(201);
 
-        $published = $this->metafields->readFor(self::SHOP, 7001);
+        $redemption = Redemption::query()->where('loyalty_account_id', $member->id)->sole();
 
-        $this->assertNotNull($published);
-        $this->assertSame(5000, $published['voucher_balance_pence']);
+        $this->assertSame('discount_code', $redemption->discount_mechanism);
+
+        // The code IS the reference. This is what lets orders/paid find the
+        // quote a paid order belongs to, with no other link between them.
+        $minted = $this->codes->readCode((string) $redemption->reference);
+
+        $this->assertNotNull($minted, 'An online hold must mint a code to apply.');
+        $this->assertSame(5000, $minted['amount_pence']);
+        $this->assertSame('gid://shopify/Customer/7001', $minted['customer_gid']);
+        $this->assertSame(
+            $redemption->quote_expires_at->format(DATE_ATOM),
+            $minted['ends_at'],
+            'The code must not outlive the quote it represents.',
+        );
+
+        // The node id comes back onto the redemption, which is what makes
+        // publishing idempotent and withdrawal possible at all.
+        $this->assertSame($minted['node_gid'], $redemption->shopify_discount_gid);
+
+        // The function's metafield is not written any more: one mechanism, not
+        // both, or a member would hold two offers for one quote.
+        $this->assertSame([], $this->metafields->written);
+
+        // Still nothing spent. Points move at orders/paid, not here.
+        $this->assertSame(0, $redemption->points_consumed);
+        $this->assertSame(0, LedgerEntry::query()->where('entry_type', 'redemption')->count());
     }
 
     /** A refusal is a 200 with a reason, so the tile can explain itself. */

@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
-use App\Domain\Redemption\DiscountFunctionGateway;
 use App\Domain\Redemption\PosCartDiscountGateway;
+use App\Domain\Redemption\RedemptionGateway;
 use App\Domain\Redemption\RedemptionService;
 use App\Models\Redemption;
 use App\Support\Api\ApiException;
@@ -75,9 +75,7 @@ class RedemptionController extends AdminController
 
         $held = $this->redemptions->hold(
             account: $member,
-            gateway: $validated['channel'] === 'pos'
-                ? app(PosCartDiscountGateway::class)
-                : app(DiscountFunctionGateway::class),
+            gateway: self::gatewayFor($validated['channel']),
             eligibleSubtotalPence: $validated['eligible_subtotal_pence'],
             basketTotalPence: $validated['basket_total_pence'],
             channel: $validated['channel'],
@@ -147,9 +145,7 @@ class RedemptionController extends AdminController
         $this->redemptions->void(
             $member,
             $redemption,
-            $redemption->channel === 'pos'
-                ? app(PosCartDiscountGateway::class)
-                : app(DiscountFunctionGateway::class),
+            self::gatewayFor($redemption->channel),
         );
 
         $this->audit->log(
@@ -161,6 +157,24 @@ class RedemptionController extends AdminController
         );
 
         return response()->json(['redemption' => self::present($redemption->refresh())]);
+    }
+
+    /**
+     * Which mechanism applies this channel's discount.
+     *
+     * One method rather than a ternary at each call site, and that is not
+     * tidiness: this choice was duplicated in `store()` and `destroy()`, so a
+     * change to one of them would have held a quote through one mechanism and
+     * tried to withdraw it through another — a published entitlement nothing
+     * takes back. Online resolves through the container, so the mechanism is
+     * decided in AppServiceProvider alone; the till is a fixed mechanism rather
+     * than a configurable one.
+     */
+    private static function gatewayFor(string $channel): RedemptionGateway
+    {
+        return $channel === 'pos'
+            ? app(PosCartDiscountGateway::class)
+            : app(RedemptionGateway::class);
     }
 
     private static function present(Redemption $redemption): array

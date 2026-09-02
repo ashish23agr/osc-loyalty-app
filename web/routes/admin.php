@@ -1,12 +1,12 @@
 <?php
 
-use App\Http\Controllers\Api\Admin\RedemptionController;
 use App\Http\Controllers\Api\Admin\AdjustmentController;
 use App\Http\Controllers\Api\Admin\AuditController;
 use App\Http\Controllers\Api\Admin\LedgerController;
 use App\Http\Controllers\Api\Admin\MeController;
 use App\Http\Controllers\Api\Admin\MemberController;
 use App\Http\Controllers\Api\Admin\OverviewController;
+use App\Http\Controllers\Api\Admin\RedemptionController;
 use App\Http\Controllers\Api\Admin\RulesController;
 use App\Http\Controllers\Api\Admin\StaffController;
 use Illuminate\Support\Facades\Route;
