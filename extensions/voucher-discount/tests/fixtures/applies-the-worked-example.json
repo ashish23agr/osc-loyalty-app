@@ -1,0 +1,110 @@
+{
+  "payload": {
+    "export": "cart-lines-discounts-generate-run",
+    "target": "cart.lines.discounts.generate.run",
+    "input": {
+      "cart": {
+        "cost": {
+          "subtotalAmount": {
+            "amount": "100.0"
+          },
+          "totalAmount": {
+            "amount": "100.0"
+          }
+        },
+        "requestedRedemption": null,
+        "redemptionReference": null,
+        "buyerIdentity": {
+          "isAuthenticated": true,
+          "customer": {
+            "id": "gid://shopify/Customer/5001",
+            "loyalty": {
+              "jsonValue": {
+                "voucher_balance_pence": 5000,
+                "voucher_value_pence": 500,
+                "max_redemption_per_order_pence": 5000,
+                "min_basket_pence": 0,
+                "account_id": 41,
+                "reference": "PC-000041"
+              }
+            }
+          }
+        },
+        "retailLocation": null,
+        "lines": [
+          {
+            "id": "gid://shopify/CartLine/0",
+            "quantity": 1,
+            "cost": {
+              "subtotalAmount": {
+                "amount": "60.0"
+              }
+            },
+            "merchandise": {
+              "__typename": "ProductVariant",
+              "id": "gid://shopify/ProductVariant/0",
+              "product": {
+                "isGiftCard": false,
+                "loyaltyExcluded": null
+              }
+            }
+          },
+          {
+            "id": "gid://shopify/CartLine/1",
+            "quantity": 1,
+            "cost": {
+              "subtotalAmount": {
+                "amount": "40.0"
+              }
+            },
+            "merchandise": {
+              "__typename": "ProductVariant",
+              "id": "gid://shopify/ProductVariant/1",
+              "product": {
+                "isGiftCard": true,
+                "loyaltyExcluded": null
+              }
+            }
+          }
+        ]
+      },
+      "discount": {
+        "discountClasses": [
+          "ORDER",
+          "PRODUCT"
+        ]
+      },
+      "shop": {
+        "loyaltyConfig": null
+      }
+    },
+    "output": {
+      "operations": [
+        {
+          "orderDiscountsAdd": {
+            "candidates": [
+              {
+                "message": "Privilege Club \u00a350 (PC-000041)",
+                "targets": [
+                  {
+                    "orderSubtotal": {
+                      "excludedCartLineIds": [
+                        "gid://shopify/CartLine/1"
+                      ]
+                    }
+                  }
+                ],
+                "value": {
+                  "fixedAmount": {
+                    "amount": "50.00"
+                  }
+                }
+              }
+            ],
+            "selectionStrategy": "FIRST"
+          }
+        }
+      ]
+    }
+  }
+}

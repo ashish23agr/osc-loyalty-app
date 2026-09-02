@@ -1,0 +1,95 @@
+query CartInput {
+  cart {
+    # The basket figures the ladder needs (D8). subtotalAmount is before tax and
+    # shipping, which is the same base D3 earns on.
+    cost {
+      subtotalAmount {
+        amount
+      }
+      totalAmount {
+        amount
+      }
+    }
+
+    # C1, still open: how the customer chooses an amount online. Whatever the
+    # answer turns out to be, it arrives here as a cart attribute — and a cart
+    # attribute is CLIENT-WRITABLE, so this is a request, never an entitlement.
+    # It can only ever ask for LESS than the ladder already allows.
+    requestedRedemption: attribute(key: "loyalty_redeem_pence") {
+      value
+    }
+
+    # The reference the app issued for this quote, so a till receipt, the
+    # discount and the audit entry all share one id (D6 does the same at POS).
+    redemptionReference: attribute(key: "loyalty_reference") {
+      value
+    }
+
+    buyerIdentity {
+      # A cart attribute can be set by anyone; a customer cannot be faked.
+      isAuthenticated
+      customer {
+        id
+        # No namespace, so this is the APP-RESERVED namespace: only this app can
+        # write it. That is what makes it the trustworthy figure and the cart
+        # attribute above merely a request. It carries the member's voucher
+        # balance and the rule values in force, because a function cannot call
+        # back into the app to ask.
+        loyalty: metafield(key: "voucher") {
+          jsonValue
+        }
+      }
+    }
+
+    # Present on a POS sale, absent online. Recorded so a redemption can be
+    # attributed to the store that took it (MD10).
+    retailLocation {
+      id
+      name
+    }
+
+    lines {
+      id
+      quantity
+      cost {
+        subtotalAmount {
+          amount
+        }
+      }
+      merchandise {
+        __typename
+        ... on ProductVariant {
+          id
+          product {
+            isGiftCard
+            # V6a: a per-product boolean the app syncs from the saved rule
+            # version, in the app-reserved namespace.
+            #
+            # It is a boolean rather than the rule itself because an input query
+            # is STATIC: hasAnyTag(tags: [...]) would fix the tag list at deploy
+            # time, and Product exposes no enumerable tag list to compare
+            # against at runtime. So the app resolves the rule - whatever its
+            # mode, include or exclude - down to one flag per product, and the
+            # function never has to know what the rule was.
+            loyaltyExcluded: metafield(key: "excluded") {
+              jsonValue
+            }
+          }
+        }
+      }
+    }
+  }
+
+  # V6a: the exclusion config as OSC saved it. The function does not evaluate it
+  # - the per-product flag above is already the answer - but reading the version
+  # stamp is how a half-finished sync becomes visible instead of silent.
+  shop {
+    loyaltyConfig: metafield(key: "exclusions") {
+      jsonValue
+    }
+  }
+
+  discount {
+    discountClasses
+  }
+}

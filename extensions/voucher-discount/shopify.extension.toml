@@ -1,0 +1,22 @@
+api_version = "2026-07"
+
+[[extensions]]
+name = "t:name"
+handle = "voucher-discount"
+type = "function"
+uid = "76e54058-c84b-ae6a-af90-894f9b2fc6fa6ef91721"
+description = "t:description"
+
+  # The only target the Blueprint requires: voucher value applied to cart lines
+  # at checkout (D5). The scaffold also declared
+  # cart.delivery-options.discounts.generate.run, which nothing in the
+  # programme uses - it was removed rather than shipped as an unused entry
+  # point that a future reader would assume is load-bearing.
+  [[extensions.targeting]]
+  target = "cart.lines.discounts.generate.run"
+  input_query = "src/cart_lines_discounts_generate_run.graphql"
+  export = "cart-lines-discounts-generate-run"
+
+  [extensions.build]
+  command = ""
+  path = "dist/function.wasm"

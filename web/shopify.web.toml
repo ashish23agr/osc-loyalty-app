@@ -1,0 +1,7 @@
+# Tells the Shopify CLI how to run the Laravel backend.
+roles = ["backend"]
+
+[commands]
+# Keep the schema in sync before the server boots.
+predev = "php artisan migrate --force"
+dev = "node serve.mjs"

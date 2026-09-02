@@ -1,0 +1,21 @@
+{
+  "name": "oxford-staging",
+  "version": "1.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "shopify": "shopify",
+    "dev": "shopify app dev",
+    "build": "shopify app build",
+    "deploy": "shopify app deploy",
+    "info": "shopify app info",
+    "config:link": "shopify app config link"
+  },
+  "dependencies": {
+    "@preact/signals": "^2.11.1",
+    "@shopify/cli": "^4",
+    "@shopify/shopify_function": "~2.0.0",
+    "@shopify/ui-extensions": "2025.10.16",
+    "preact": "^10.29.8"
+  }
+}

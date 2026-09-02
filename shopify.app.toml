@@ -1,0 +1,52 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+name = "OSC Loyalty Solution"
+client_id = "9b28cadf317aed92cad0ce1ed836f1c4"
+# The current `shopify app dev` tunnel. Deployed deliberately: under
+# use_legacy_install_flow the OAuth redirect_uri is validated against the
+# RELEASED app version's allowlist, so while this said
+# shopify.dev/apps/default-app-home no grant against a tunnel could ever
+# complete. A tunnel URL is ephemeral - re-deploy after a tunnel change,
+# and replace both this and redirect_urls with the production URL before
+# go-live. See "Dev notes" in README.md.
+application_url = "https://instances-pierre-wanna-featuring.trycloudflare.com"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_customers,write_customers,read_orders,read_discounts,write_discounts,read_locations,read_products,write_products"
+# This foundation implements the classic (app-managed) OAuth flow in Laravel,
+# which is what shopify/shopify-api-php v6 supports out of the box.
+use_legacy_install_flow = true
+
+[auth]
+redirect_urls = [
+  "https://instances-pierre-wanna-featuring.trycloudflare.com/api/auth/callback",
+  "https://instances-pierre-wanna-featuring.trycloudflare.com/auth/callback",
+  "https://instances-pierre-wanna-featuring.trycloudflare.com/auth/shopify/callback",
+]
+
+[webhooks]
+api_version = "2026-07"
+
+# There is deliberately no [[webhooks.subscriptions]] block. `shopify app deploy`
+# rejects the whole app version with "App-specific webhook subscriptions are not
+# supported when use_legacy_install_flow is enabled", and that flag is a hard
+# constraint for this app. Every business topic is registered per shop through
+# the Admin API after OAuth - see config('shopify.webhooks.topics') in
+# web/config/shopify.php. Note that `shopify app dev` accepts declared topics,
+# so this only shows up at deploy time.
+#
+# The privacy compliance webhooks below are the exception: they deploy fine and
+# cannot be created through the Admin API.
+
+  [webhooks.privacy_compliance]
+  customer_deletion_url = "/api/webhooks"
+  customer_data_request_url = "/api/webhooks"
+  shop_deletion_url = "/api/webhooks"
+
+[pos]
+embedded = false

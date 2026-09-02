@@ -1,0 +1,7 @@
+# Tells the Shopify CLI how to run the React frontend.
+# The CLI tunnel points here; /api/* is proxied through to Laravel.
+roles = ["frontend"]
+
+[commands]
+dev = "npm run dev"
+build = "npm run build"

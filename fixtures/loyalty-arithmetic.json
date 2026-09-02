@@ -1,0 +1,1330 @@
+{
+  "_meta": {
+    "purpose": "The single source of truth for every loyalty calculation, consumed by BOTH test suites: PHPUnit in web/ and Vitest in extensions/voucher-discount/. The redemption ladder is implemented twice - once in PHP for the quote, once in Wasm for the discount function - and two implementations of one business rule will drift. Changing a rule means changing this file, which fails whichever side has not been updated.",
+    "money": "All monetary values are integer pence. All point values are integers.",
+    "sections": {
+      "balance_derivation": "M2, sprint 1. floor(available / threshold) * value.",
+      "lot_allocation": "M2, sprint 1. FIFO consumption across earn lots.",
+      "adjustment": "M2, sprint 1. Manual adjustments and their effect on buckets.",
+      "redemption_ladder": "M6/M7, sprint 3. The ordered limit ladder: eligible subtotal -> minimum basket -> configured cap -> strictly below basket value -> round down to the voucher increment. Implemented TWICE - PHP for the quote, TypeScript compiled to Wasm for the discount function - and this file is what stops the two drifting.",
+      "refund_reversal": "M8, sprint 2. D9c cumulative floor: floor(points * cumulative_refunded / order_eligible) minus what is already posted. Never round a single refund's own fraction.",
+      "refund_reversal_sequences": "M8, sprint 2. D9c consequences: any split of a refund totals what one refund would have, and a full refund always nets to zero remaining.",
+      "lot_release": "M8, sprint 2. D9a: restored points go back to the lots the redemption drew from, oldest first, capped at what each lot gave, so a redeem-and-refund cycle cannot extend a point's life.",
+      "earning": "M3, sprint 2. D3 earn base: line totals after discount, ex tax, ex shipping; qualification by collection or tag; floored to whole points ONCE per order."
+    },
+    "source": "Privilege Club Blueprint Rev 2, sections 05 and 06; decisions D1, D2, D8, D9 and D9a-D9d."
+  },
+  "rule_sets": {
+    "launch": {
+      "voucher_threshold_points": 100,
+      "voucher_value_pence": 500,
+      "max_redemption_per_order_pence": 5000,
+      "min_basket_pence": 0,
+      "pending_period_days": 30,
+      "points_expiry_days": 182
+    },
+    "half_threshold": {
+      "voucher_threshold_points": 50,
+      "voucher_value_pence": 250,
+      "max_redemption_per_order_pence": 5000,
+      "min_basket_pence": 0,
+      "pending_period_days": 30,
+      "points_expiry_days": 182
+    }
+  },
+  "balance_derivation": [
+    {
+      "name": "Blueprint worked example: 190 points yields five pounds with ninety retained",
+      "rules": "launch",
+      "available_points": 190,
+      "expect": {
+        "increments": 1,
+        "voucher_balance_pence": 500,
+        "remainder_points": 90,
+        "points_to_next_increment": 10
+      }
+    },
+    {
+      "name": "Below the threshold there is no voucher at all",
+      "rules": "launch",
+      "available_points": 99,
+      "expect": {
+        "increments": 0,
+        "voucher_balance_pence": 0,
+        "remainder_points": 99,
+        "points_to_next_increment": 1
+      }
+    },
+    {
+      "name": "Exactly the threshold",
+      "rules": "launch",
+      "available_points": 100,
+      "expect": {
+        "increments": 1,
+        "voucher_balance_pence": 500,
+        "remainder_points": 0,
+        "points_to_next_increment": 100
+      }
+    },
+    {
+      "name": "One point short of the second increment",
+      "rules": "launch",
+      "available_points": 199,
+      "expect": {
+        "increments": 1,
+        "voucher_balance_pence": 500,
+        "remainder_points": 99,
+        "points_to_next_increment": 1
+      }
+    },
+    {
+      "name": "Exact multiple, nothing retained",
+      "rules": "launch",
+      "available_points": 200,
+      "expect": {
+        "increments": 2,
+        "voucher_balance_pence": 1000,
+        "remainder_points": 0,
+        "points_to_next_increment": 100
+      }
+    },
+    {
+      "name": "Zero balance",
+      "rules": "launch",
+      "available_points": 0,
+      "expect": {
+        "increments": 0,
+        "voucher_balance_pence": 0,
+        "remainder_points": 0,
+        "points_to_next_increment": 100
+      }
+    },
+    {
+      "name": "Negative available after a clawback is floored at zero for the customer (Q3)",
+      "rules": "launch",
+      "available_points": -50,
+      "expect": {
+        "increments": 0,
+        "voucher_balance_pence": 0,
+        "remainder_points": -50,
+        "points_to_next_increment": 150
+      }
+    },
+    {
+      "name": "Derivation reads the rule version, it does not hardcode 100 and 500",
+      "rules": "half_threshold",
+      "available_points": 190,
+      "expect": {
+        "increments": 3,
+        "voucher_balance_pence": 750,
+        "remainder_points": 40,
+        "points_to_next_increment": 10
+      }
+    },
+    {
+      "name": "Large balance",
+      "rules": "launch",
+      "available_points": 12345,
+      "expect": {
+        "increments": 123,
+        "voucher_balance_pence": 61500,
+        "remainder_points": 45,
+        "points_to_next_increment": 55
+      }
+    }
+  ],
+  "lot_allocation": [
+    {
+      "name": "A single lot covers the whole consumption",
+      "lots": [
+        {
+          "points": 500,
+          "already_allocated": 0
+        }
+      ],
+      "consume": 200,
+      "expect": {
+        "allocations": [
+          200
+        ],
+        "unallocated": 0
+      }
+    },
+    {
+      "name": "FIFO: the oldest lot is drained before the next is touched",
+      "lots": [
+        {
+          "points": 100,
+          "already_allocated": 0
+        },
+        {
+          "points": 300,
+          "already_allocated": 0
+        }
+      ],
+      "consume": 250,
+      "expect": {
+        "allocations": [
+          100,
+          150
+        ],
+        "unallocated": 0
+      }
+    },
+    {
+      "name": "A partly consumed lot only offers what remains",
+      "lots": [
+        {
+          "points": 100,
+          "already_allocated": 80
+        },
+        {
+          "points": 300,
+          "already_allocated": 0
+        }
+      ],
+      "consume": 100,
+      "expect": {
+        "allocations": [
+          20,
+          80
+        ],
+        "unallocated": 0
+      }
+    },
+    {
+      "name": "Exhausted lots are skipped entirely",
+      "lots": [
+        {
+          "points": 100,
+          "already_allocated": 100
+        },
+        {
+          "points": 50,
+          "already_allocated": 0
+        }
+      ],
+      "consume": 50,
+      "expect": {
+        "allocations": [
+          0,
+          50
+        ],
+        "unallocated": 0
+      }
+    },
+    {
+      "name": "Consuming more than the lots hold reports the shortfall rather than inventing points",
+      "lots": [
+        {
+          "points": 100,
+          "already_allocated": 0
+        }
+      ],
+      "consume": 250,
+      "expect": {
+        "allocations": [
+          100
+        ],
+        "unallocated": 150
+      }
+    },
+    {
+      "name": "Nothing to consume allocates nothing",
+      "lots": [
+        {
+          "points": 100,
+          "already_allocated": 0
+        }
+      ],
+      "consume": 0,
+      "expect": {
+        "allocations": [
+          0
+        ],
+        "unallocated": 0
+      }
+    }
+  ],
+  "adjustment": [
+    {
+      "name": "A positive adjustment to available raises the balance immediately",
+      "rules": "launch",
+      "opening": {
+        "pending": 0,
+        "available": 150
+      },
+      "posting": {
+        "bucket": "available",
+        "points_delta": 50
+      },
+      "expect": {
+        "pending": 0,
+        "available": 200,
+        "voucher_balance_pence": 1000
+      }
+    },
+    {
+      "name": "A negative adjustment lowers it",
+      "rules": "launch",
+      "opening": {
+        "pending": 0,
+        "available": 150
+      },
+      "posting": {
+        "bucket": "available",
+        "points_delta": -60
+      },
+      "expect": {
+        "pending": 0,
+        "available": 90,
+        "voucher_balance_pence": 0
+      }
+    },
+    {
+      "name": "An adjustment to pending does not change the voucher balance",
+      "rules": "launch",
+      "opening": {
+        "pending": 0,
+        "available": 100
+      },
+      "posting": {
+        "bucket": "pending",
+        "points_delta": 500
+      },
+      "expect": {
+        "pending": 500,
+        "available": 100,
+        "voucher_balance_pence": 500
+      }
+    },
+    {
+      "name": "A negative adjustment may take available below zero, and the voucher floors at zero (Q3)",
+      "rules": "launch",
+      "opening": {
+        "pending": 0,
+        "available": 20
+      },
+      "posting": {
+        "bucket": "available",
+        "points_delta": -70
+      },
+      "expect": {
+        "pending": 0,
+        "available": -50,
+        "voucher_balance_pence": 0
+      }
+    }
+  ],
+  "redemption_ladder": [
+    {
+      "name": "Blueprint worked example: 100 pound basket, 60 eligible, 50 balance",
+      "rules": "launch",
+      "input": {
+        "voucher_balance_pence": 5000,
+        "eligible_subtotal_pence": 6000,
+        "basket_total_pence": 10000
+      },
+      "expect": {
+        "redeemable_pence": 5000,
+        "reason": null
+      }
+    },
+    {
+      "name": "The eligible subtotal binds below the balance (D8)",
+      "rules": "launch",
+      "input": {
+        "voucher_balance_pence": 5000,
+        "eligible_subtotal_pence": 2000,
+        "basket_total_pence": 10000
+      },
+      "expect": {
+        "redeemable_pence": 2000,
+        "reason": null
+      }
+    },
+    {
+      "name": "Voucher spend must stay below basket value, then round down to the increment",
+      "rules": "launch",
+      "input": {
+        "voucher_balance_pence": 5000,
+        "eligible_subtotal_pence": 2000,
+        "basket_total_pence": 2000
+      },
+      "expect": {
+        "redeemable_pence": 1500,
+        "reason": null
+      }
+    },
+    {
+      "name": "The configured per-order cap binds",
+      "rules": "launch",
+      "override_rules": {
+        "max_redemption_per_order_pence": 2000
+      },
+      "input": {
+        "voucher_balance_pence": 5000,
+        "eligible_subtotal_pence": 6000,
+        "basket_total_pence": 10000
+      },
+      "expect": {
+        "redeemable_pence": 2000,
+        "reason": null
+      }
+    },
+    {
+      "name": "A basket under the minimum spend redeems nothing, with a reason the tile can show",
+      "rules": "launch",
+      "override_rules": {
+        "min_basket_pence": 2500
+      },
+      "input": {
+        "voucher_balance_pence": 5000,
+        "eligible_subtotal_pence": 1000,
+        "basket_total_pence": 1000
+      },
+      "expect": {
+        "redeemable_pence": 0,
+        "reason": "minimum_basket_not_met"
+      }
+    },
+    {
+      "name": "No balance, nothing to redeem",
+      "rules": "launch",
+      "input": {
+        "voucher_balance_pence": 0,
+        "eligible_subtotal_pence": 6000,
+        "basket_total_pence": 10000
+      },
+      "expect": {
+        "redeemable_pence": 0,
+        "reason": "no_voucher_balance"
+      }
+    },
+    {
+      "name": "Every item excluded, so nothing qualifies",
+      "rules": "launch",
+      "input": {
+        "voucher_balance_pence": 5000,
+        "eligible_subtotal_pence": 0,
+        "basket_total_pence": 10000
+      },
+      "expect": {
+        "redeemable_pence": 0,
+        "reason": "no_eligible_items"
+      }
+    },
+    {
+      "name": "Rounding down never produces a value above the eligible subtotal",
+      "rules": "launch",
+      "input": {
+        "voucher_balance_pence": 5000,
+        "eligible_subtotal_pence": 799,
+        "basket_total_pence": 10000
+      },
+      "expect": {
+        "redeemable_pence": 500,
+        "reason": null
+      }
+    },
+    {
+      "name": "The agreed UI's rejection example: 70 pound basket, 45 eligible, offer 45",
+      "rules": "launch",
+      "input": {
+        "voucher_balance_pence": 5000,
+        "eligible_subtotal_pence": 4500,
+        "basket_total_pence": 7000
+      },
+      "expect": {
+        "redeemable_pence": 4500,
+        "reason": null
+      },
+      "note": "Straight from the UI file. The member holds 50 pounds of voucher value but only 45 pounds of the basket qualifies, so the tile offers 45 and says why - it does not offer 50 and fail at the till."
+    },
+    {
+      "name": "Eligible items worth less than one increment redeem nothing, with a reason",
+      "rules": "launch",
+      "input": {
+        "voucher_balance_pence": 5000,
+        "eligible_subtotal_pence": 400,
+        "basket_total_pence": 10000
+      },
+      "expect": {
+        "redeemable_pence": 0,
+        "reason": "below_voucher_increment"
+      },
+      "note": "Rounding down to the 5 pound increment lands on zero. The tile has to say that rather than showing a redeem button that produces nothing."
+    }
+  ],
+  "refund_reversal": [
+    {
+      "name": "Worked example: a 20 pound refund of an 80 pound order",
+      "rules": "launch",
+      "input": {
+        "points_earned": 80,
+        "points_redeemed": 200,
+        "order_eligible_pence": 8000,
+        "cumulative_refunded_pence": 2000,
+        "already_reversed": 0,
+        "already_restored": 0
+      },
+      "expect": {
+        "reverse": 20,
+        "restore": 50,
+        "cumulative_reversed": 20,
+        "cumulative_restored": 50,
+        "full_refund": false
+      },
+      "note": "A clean quarter. 25% of 80 earned and 25% of 200 redeemed, both exact."
+    },
+    {
+      "name": "The 21 pound refund, p = 0.2625, where flooring actually bites",
+      "rules": "launch",
+      "input": {
+        "points_earned": 80,
+        "points_redeemed": 200,
+        "order_eligible_pence": 8000,
+        "cumulative_refunded_pence": 2100,
+        "already_reversed": 0,
+        "already_restored": 0
+      },
+      "expect": {
+        "reverse": 21,
+        "restore": 52,
+        "cumulative_reversed": 21,
+        "cumulative_restored": 52,
+        "full_refund": false
+      },
+      "note": "floor(200 * 2100 / 8000) = floor(52.5) = 52. The half point is not given away."
+    },
+    {
+      "name": "A full refund reverses everything and restores everything",
+      "rules": "launch",
+      "input": {
+        "points_earned": 80,
+        "points_redeemed": 200,
+        "order_eligible_pence": 8000,
+        "cumulative_refunded_pence": 8000,
+        "already_reversed": 0,
+        "already_restored": 0
+      },
+      "expect": {
+        "reverse": 80,
+        "restore": 200,
+        "cumulative_reversed": 80,
+        "cumulative_restored": 200,
+        "full_refund": true
+      }
+    },
+    {
+      "name": "An over-refund is clamped to the order, not extrapolated",
+      "rules": "launch",
+      "input": {
+        "points_earned": 80,
+        "points_redeemed": 200,
+        "order_eligible_pence": 8000,
+        "cumulative_refunded_pence": 9000,
+        "already_reversed": 0,
+        "already_restored": 0
+      },
+      "expect": {
+        "reverse": 80,
+        "restore": 200,
+        "cumulative_reversed": 80,
+        "cumulative_restored": 200,
+        "full_refund": true
+      },
+      "note": "Shopify permits refunding more than the order; the answer is still everything, never more."
+    },
+    {
+      "name": "Nothing was redeemed, so there is nothing to restore",
+      "rules": "launch",
+      "input": {
+        "points_earned": 80,
+        "points_redeemed": 0,
+        "order_eligible_pence": 8000,
+        "cumulative_refunded_pence": 2100,
+        "already_reversed": 0,
+        "already_restored": 0
+      },
+      "expect": {
+        "reverse": 21,
+        "restore": 0,
+        "cumulative_reversed": 21,
+        "cumulative_restored": 0,
+        "full_refund": false
+      }
+    },
+    {
+      "name": "Nothing was earned, but a redemption still comes back",
+      "rules": "launch",
+      "input": {
+        "points_earned": 0,
+        "points_redeemed": 200,
+        "order_eligible_pence": 8000,
+        "cumulative_refunded_pence": 2100,
+        "already_reversed": 0,
+        "already_restored": 0
+      },
+      "expect": {
+        "reverse": 0,
+        "restore": 52,
+        "cumulative_reversed": 0,
+        "cumulative_restored": 52,
+        "full_refund": false
+      }
+    },
+    {
+      "name": "A redelivered refund computes an increment of zero",
+      "rules": "launch",
+      "input": {
+        "points_earned": 80,
+        "points_redeemed": 200,
+        "order_eligible_pence": 8000,
+        "cumulative_refunded_pence": 2100,
+        "already_reversed": 21,
+        "already_restored": 52
+      },
+      "expect": {
+        "reverse": 0,
+        "restore": 0,
+        "cumulative_reversed": 21,
+        "cumulative_restored": 52,
+        "full_refund": false
+      },
+      "note": "The cumulative total is already posted, so the increment is nothing. Idempotency before the key is even consulted."
+    },
+    {
+      "name": "A smaller corrected total never takes points back from the member",
+      "rules": "launch",
+      "input": {
+        "points_earned": 80,
+        "points_redeemed": 200,
+        "order_eligible_pence": 8000,
+        "cumulative_refunded_pence": 700,
+        "already_reversed": 21,
+        "already_restored": 52
+      },
+      "expect": {
+        "reverse": 0,
+        "restore": 0,
+        "cumulative_reversed": 7,
+        "cumulative_restored": 17,
+        "full_refund": false
+      },
+      "note": "max(0, target - already). A revised-down refund posts nothing rather than an entry that claws back."
+    }
+  ],
+  "refund_reversal_sequences": [
+    {
+      "name": "Three 7 pound refunds equal one 21 pound refund, entry for entry",
+      "rules": "launch",
+      "input": {
+        "points_earned": 80,
+        "points_redeemed": 200,
+        "order_eligible_pence": 8000,
+        "refunds_cumulative_pence": [
+          700,
+          1400,
+          2100
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "cumulative_refunded_pence": 700,
+            "reverse": 7,
+            "restore": 17
+          },
+          {
+            "cumulative_refunded_pence": 1400,
+            "reverse": 7,
+            "restore": 18
+          },
+          {
+            "cumulative_refunded_pence": 2100,
+            "reverse": 7,
+            "restore": 17
+          }
+        ],
+        "total_reversed": 21,
+        "total_restored": 52,
+        "full_refund": false
+      },
+      "per_refund_floor_would_total": {
+        "reversed": 21,
+        "restored": 51
+      },
+      "note": "The point of the cumulative floor. Per-refund flooring restores 51 and the member is a point down for returning things separately."
+    },
+    {
+      "name": "A full refund after a partial nets to exactly zero remaining",
+      "rules": "launch",
+      "input": {
+        "points_earned": 80,
+        "points_redeemed": 200,
+        "order_eligible_pence": 8000,
+        "refunds_cumulative_pence": [
+          2100,
+          8000
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "cumulative_refunded_pence": 2100,
+            "reverse": 21,
+            "restore": 52
+          },
+          {
+            "cumulative_refunded_pence": 8000,
+            "reverse": 59,
+            "restore": 148
+          }
+        ],
+        "total_reversed": 80,
+        "total_restored": 200,
+        "full_refund": true
+      },
+      "per_refund_floor_would_total": {
+        "reversed": 80,
+        "restored": 199
+      },
+      "note": "21 + 59 = 80 earned reversed; 52 + 148 = 200 redeemed restored. No residue, whatever route was taken."
+    },
+    {
+      "name": "Two halves make a whole",
+      "rules": "launch",
+      "input": {
+        "points_earned": 80,
+        "points_redeemed": 200,
+        "order_eligible_pence": 8000,
+        "refunds_cumulative_pence": [
+          4000,
+          8000
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "cumulative_refunded_pence": 4000,
+            "reverse": 40,
+            "restore": 100
+          },
+          {
+            "cumulative_refunded_pence": 8000,
+            "reverse": 40,
+            "restore": 100
+          }
+        ],
+        "total_reversed": 80,
+        "total_restored": 200,
+        "full_refund": true
+      },
+      "per_refund_floor_would_total": {
+        "reversed": 80,
+        "restored": 200
+      }
+    },
+    {
+      "name": "Four uneven instalments still land on 80 and 200",
+      "rules": "launch",
+      "input": {
+        "points_earned": 80,
+        "points_redeemed": 200,
+        "order_eligible_pence": 8000,
+        "refunds_cumulative_pence": [
+          999,
+          2500,
+          6001,
+          8000
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "cumulative_refunded_pence": 999,
+            "reverse": 9,
+            "restore": 24
+          },
+          {
+            "cumulative_refunded_pence": 2500,
+            "reverse": 16,
+            "restore": 38
+          },
+          {
+            "cumulative_refunded_pence": 6001,
+            "reverse": 35,
+            "restore": 88
+          },
+          {
+            "cumulative_refunded_pence": 8000,
+            "reverse": 20,
+            "restore": 50
+          }
+        ],
+        "total_reversed": 80,
+        "total_restored": 200,
+        "full_refund": true
+      },
+      "per_refund_floor_would_total": {
+        "reversed": 78,
+        "restored": 197
+      }
+    }
+  ],
+  "lot_release": [
+    {
+      "name": "A single lot takes back part of what it gave",
+      "allocations": [
+        {
+          "allocated": 200,
+          "already_released": 0
+        }
+      ],
+      "release": 50,
+      "expect": {
+        "releases": [
+          50
+        ],
+        "unreleased": 0
+      }
+    },
+    {
+      "name": "Oldest lot first, the same order the consumption used",
+      "allocations": [
+        {
+          "allocated": 60,
+          "already_released": 0
+        },
+        {
+          "allocated": 140,
+          "already_released": 0
+        }
+      ],
+      "release": 50,
+      "expect": {
+        "releases": [
+          50,
+          0
+        ],
+        "unreleased": 0
+      }
+    },
+    {
+      "name": "A release spills into the next lot once the first is whole again",
+      "allocations": [
+        {
+          "allocated": 60,
+          "already_released": 0
+        },
+        {
+          "allocated": 140,
+          "already_released": 0
+        }
+      ],
+      "release": 100,
+      "expect": {
+        "releases": [
+          60,
+          40
+        ],
+        "unreleased": 0
+      }
+    },
+    {
+      "name": "A second partial refund picks up where the first left off",
+      "allocations": [
+        {
+          "allocated": 200,
+          "already_released": 50
+        }
+      ],
+      "release": 50,
+      "expect": {
+        "releases": [
+          50
+        ],
+        "unreleased": 0
+      }
+    },
+    {
+      "name": "A lot can never be handed back more than it gave",
+      "allocations": [
+        {
+          "allocated": 200,
+          "already_released": 200
+        }
+      ],
+      "release": 10,
+      "expect": {
+        "releases": [
+          0
+        ],
+        "unreleased": 10
+      }
+    },
+    {
+      "name": "A full restore returns every lot to where it started",
+      "allocations": [
+        {
+          "allocated": 60,
+          "already_released": 0
+        },
+        {
+          "allocated": 140,
+          "already_released": 0
+        }
+      ],
+      "release": 200,
+      "expect": {
+        "releases": [
+          60,
+          140
+        ],
+        "unreleased": 0
+      }
+    }
+  ],
+  "earning": [
+    {
+      "name": "The worked example: an 80 pound eligible order earns 80 points",
+      "rules": "launch",
+      "order": {
+        "lines": [
+          {
+            "id": "L1",
+            "discounted_total_ex_tax_pence": 8000,
+            "current_quantity": 1
+          }
+        ]
+      },
+      "expect": {
+        "qualifying_pence": 8000,
+        "excluded_pence": 0,
+        "points": 80
+      },
+      "note": "D3: line totals after discount, excluding tax and excluding shipping. Shipping is not a line here at all, and tax is removed by the order source."
+    },
+    {
+      "name": "Several lines are floored once for the whole order, never per line",
+      "rules": "launch",
+      "order": {
+        "lines": [
+          {
+            "id": "L1",
+            "discounted_total_ex_tax_pence": 1099,
+            "current_quantity": 1
+          },
+          {
+            "id": "L2",
+            "discounted_total_ex_tax_pence": 1099,
+            "current_quantity": 1
+          },
+          {
+            "id": "L3",
+            "discounted_total_ex_tax_pence": 1099,
+            "current_quantity": 1
+          }
+        ]
+      },
+      "expect": {
+        "qualifying_pence": 3297,
+        "excluded_pence": 0,
+        "points": 32
+      },
+      "note": "3297p floors to 32 points. Flooring each line would give 10+10+10 = 30 and the member would lose two points for buying three things instead of one."
+    },
+    {
+      "name": "A zero-value order earns nothing",
+      "rules": "launch",
+      "order": {
+        "lines": [
+          {
+            "id": "L1",
+            "discounted_total_ex_tax_pence": 0,
+            "current_quantity": 1
+          }
+        ]
+      },
+      "expect": {
+        "qualifying_pence": 0,
+        "excluded_pence": 0,
+        "points": 0
+      },
+      "note": "A fully comped or zero-priced order is not an error; it simply earns nothing."
+    },
+    {
+      "name": "An order with no lines at all earns nothing",
+      "rules": "launch",
+      "order": {
+        "lines": []
+      },
+      "expect": {
+        "qualifying_pence": 0,
+        "excluded_pence": 0,
+        "points": 0
+      }
+    },
+    {
+      "name": "A fully discounted line contributes nothing but is not an error",
+      "rules": "launch",
+      "order": {
+        "lines": [
+          {
+            "id": "L1",
+            "discounted_total_ex_tax_pence": 0,
+            "current_quantity": 1
+          },
+          {
+            "id": "L2",
+            "discounted_total_ex_tax_pence": 2500,
+            "current_quantity": 1
+          }
+        ]
+      },
+      "expect": {
+        "qualifying_pence": 2500,
+        "excluded_pence": 0,
+        "points": 25
+      },
+      "note": "100% off leaves a line total of zero. The rest of the basket still earns."
+    },
+    {
+      "name": "A refunded line, quantity now zero, stops counting",
+      "rules": "launch",
+      "order": {
+        "lines": [
+          {
+            "id": "L1",
+            "discounted_total_ex_tax_pence": 4000,
+            "current_quantity": 0
+          },
+          {
+            "id": "L2",
+            "discounted_total_ex_tax_pence": 2000,
+            "current_quantity": 1
+          }
+        ]
+      },
+      "expect": {
+        "qualifying_pence": 2000,
+        "excluded_pence": 4000,
+        "points": 20
+      },
+      "note": "Shopify represents a removed or refunded line as current_quantity 0. Counting it would pay a member for something they no longer have."
+    },
+    {
+      "name": "Under a pound earns nothing, and is not rounded up",
+      "rules": "launch",
+      "order": {
+        "lines": [
+          {
+            "id": "L1",
+            "discounted_total_ex_tax_pence": 99,
+            "current_quantity": 1
+          }
+        ]
+      },
+      "expect": {
+        "qualifying_pence": 99,
+        "excluded_pence": 0,
+        "points": 0
+      },
+      "note": "floor(99 x 1 / 100) = 0. Rounding up would hand out points nobody earned."
+    },
+    {
+      "name": "An excluded tag takes its line out of the base",
+      "rules": "launch",
+      "override_rules": {
+        "qualification": {
+          "mode": "all",
+          "include_collections": [],
+          "include_tags": [],
+          "exclude_collections": [],
+          "exclude_tags": [
+            "gift-card"
+          ]
+        }
+      },
+      "order": {
+        "lines": [
+          {
+            "id": "L1",
+            "discounted_total_ex_tax_pence": 6000,
+            "current_quantity": 1,
+            "tags": [
+              "gift-card"
+            ]
+          },
+          {
+            "id": "L2",
+            "discounted_total_ex_tax_pence": 4000,
+            "current_quantity": 1,
+            "tags": [
+              "shirt"
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "qualifying_pence": 4000,
+        "excluded_pence": 6000,
+        "points": 40
+      }
+    },
+    {
+      "name": "An excluded collection takes its line out of the base",
+      "rules": "launch",
+      "override_rules": {
+        "qualification": {
+          "mode": "all",
+          "include_collections": [],
+          "include_tags": [],
+          "exclude_collections": [
+            "clearance"
+          ],
+          "exclude_tags": []
+        }
+      },
+      "order": {
+        "lines": [
+          {
+            "id": "L1",
+            "discounted_total_ex_tax_pence": 6000,
+            "current_quantity": 1,
+            "collections": [
+              "clearance"
+            ]
+          },
+          {
+            "id": "L2",
+            "discounted_total_ex_tax_pence": 4000,
+            "current_quantity": 1,
+            "collections": [
+              "mens"
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "qualifying_pence": 4000,
+        "excluded_pence": 6000,
+        "points": 40
+      }
+    },
+    {
+      "name": "An order made entirely of excluded items earns nothing",
+      "rules": "launch",
+      "override_rules": {
+        "qualification": {
+          "mode": "all",
+          "include_collections": [],
+          "include_tags": [],
+          "exclude_collections": [],
+          "exclude_tags": [
+            "gift-card"
+          ]
+        }
+      },
+      "order": {
+        "lines": [
+          {
+            "id": "L1",
+            "discounted_total_ex_tax_pence": 6000,
+            "current_quantity": 1,
+            "tags": [
+              "gift-card"
+            ]
+          },
+          {
+            "id": "L2",
+            "discounted_total_ex_tax_pence": 3000,
+            "current_quantity": 1,
+            "tags": [
+              "gift-card"
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "qualifying_pence": 0,
+        "excluded_pence": 9000,
+        "points": 0
+      },
+      "note": "The representable form of 'only non-qualifying value'. Nothing is posted, and the order is not a failure."
+    },
+    {
+      "name": "In collections mode only the listed collections earn",
+      "rules": "launch",
+      "override_rules": {
+        "qualification": {
+          "mode": "collections",
+          "include_collections": [
+            "mens"
+          ],
+          "include_tags": [],
+          "exclude_collections": [],
+          "exclude_tags": []
+        }
+      },
+      "order": {
+        "lines": [
+          {
+            "id": "L1",
+            "discounted_total_ex_tax_pence": 5000,
+            "current_quantity": 1,
+            "collections": [
+              "mens"
+            ]
+          },
+          {
+            "id": "L2",
+            "discounted_total_ex_tax_pence": 5000,
+            "current_quantity": 1,
+            "collections": [
+              "sale"
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "qualifying_pence": 5000,
+        "excluded_pence": 5000,
+        "points": 50
+      }
+    },
+    {
+      "name": "In tags mode only the listed tags earn",
+      "rules": "launch",
+      "override_rules": {
+        "qualification": {
+          "mode": "tags",
+          "include_collections": [],
+          "include_tags": [
+            "full-price"
+          ],
+          "exclude_collections": [],
+          "exclude_tags": []
+        }
+      },
+      "order": {
+        "lines": [
+          {
+            "id": "L1",
+            "discounted_total_ex_tax_pence": 5000,
+            "current_quantity": 1,
+            "tags": [
+              "full-price"
+            ]
+          },
+          {
+            "id": "L2",
+            "discounted_total_ex_tax_pence": 5000,
+            "current_quantity": 1,
+            "tags": [
+              "promo"
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "qualifying_pence": 5000,
+        "excluded_pence": 5000,
+        "points": 50
+      }
+    },
+    {
+      "name": "An exclusion beats an inclusion when a line matches both",
+      "rules": "launch",
+      "override_rules": {
+        "qualification": {
+          "mode": "collections",
+          "include_collections": [
+            "mens"
+          ],
+          "include_tags": [],
+          "exclude_collections": [],
+          "exclude_tags": [
+            "gift-card"
+          ]
+        }
+      },
+      "order": {
+        "lines": [
+          {
+            "id": "L1",
+            "discounted_total_ex_tax_pence": 5000,
+            "current_quantity": 1,
+            "tags": [
+              "gift-card"
+            ],
+            "collections": [
+              "mens"
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "qualifying_pence": 0,
+        "excluded_pence": 5000,
+        "points": 0
+      },
+      "note": "Otherwise the exclusion list would be unreachable for anything inside an included collection, which is exactly where a merchant would use it."
+    },
+    {
+      "name": "Tag and collection matching ignores case",
+      "rules": "launch",
+      "override_rules": {
+        "qualification": {
+          "mode": "all",
+          "include_collections": [],
+          "include_tags": [],
+          "exclude_collections": [],
+          "exclude_tags": [
+            "gift-card"
+          ]
+        }
+      },
+      "order": {
+        "lines": [
+          {
+            "id": "L1",
+            "discounted_total_ex_tax_pence": 5000,
+            "current_quantity": 1,
+            "tags": [
+              "Gift-Card"
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "qualifying_pence": 0,
+        "excluded_pence": 5000,
+        "points": 0
+      }
+    },
+    {
+      "name": "The rate comes from the rule version, not from a constant",
+      "rules": "launch",
+      "override_rules": {
+        "earn_points_per_pound": 2
+      },
+      "order": {
+        "lines": [
+          {
+            "id": "L1",
+            "discounted_total_ex_tax_pence": 1099,
+            "current_quantity": 1
+          }
+        ]
+      },
+      "expect": {
+        "qualifying_pence": 1099,
+        "excluded_pence": 0,
+        "points": 21
+      },
+      "note": "floor(1099 x 2 / 100) = 21. Multiply then divide, so the rate is applied before the floor rather than after it."
+    }
+  ]
+}

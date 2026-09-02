@@ -1,0 +1,1376 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OSC Privilege Club — Illustrative UI Structure v1.1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#0F221B; --forest:#1B4A38; --forest2:#2A6B51;
+  --brass:#B0842F; --brass-soft:#F4E8CE;
+  --paper:#EEF1EE; --card:#fff; --line:#DBE3DE; --line2:#EDF1EE;
+  --muted:#5E7069; --muted2:#83948D;
+  --ok:#2C6E4B; --ok-bg:#E4F1E9; --warn:#8A6A17; --warn-bg:#FBF0D6;
+  --bad:#A83E38; --bad-bg:#FAE7E5; --info:#1F5A8A; --info-bg:#E4EEF6;
+  --r:10px; --shadow:0 1px 2px rgba(15,34,27,.06),0 8px 24px rgba(15,34,27,.07);
+  --sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --serif:'Fraunces',Georgia,serif;
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.5 var(--sans)}
+h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
+a{color:inherit}
+button{font:inherit;cursor:pointer}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ============ page chrome ============ */
+.pagehead{background:var(--ink);color:#fff;padding:22px 26px 0}
+.pagehead .row{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end;justify-content:space-between;max-width:1420px;margin:0 auto}
+.brand{display:flex;gap:12px;align-items:center}
+.crest{width:38px;height:38px;border-radius:9px;background:linear-gradient(150deg,var(--brass),#8A6520);display:grid;place-items:center;font-family:var(--serif);font-size:17px;color:#241a05;font-weight:600}
+.brand b{display:block;font-family:var(--serif);font-size:19px;font-weight:600;letter-spacing:0}
+.brand span{font-size:11.5px;color:#9FB4AB;letter-spacing:.09em;text-transform:uppercase}
+.meta{font-size:11.5px;color:#9FB4AB;text-align:right;line-height:1.7}
+.meta b{color:#E7EFEA;font-weight:500}
+.printbtn{background:transparent;border:1px solid #3A5A4E;color:#D8E4DE;padding:7px 13px;border-radius:7px;font-size:12px}
+.printbtn:hover{background:#1B3B30}
+
+.surftabs{display:flex;gap:4px;max-width:1420px;margin:20px auto 0;overflow-x:auto}
+.surftab{background:transparent;border:0;border-bottom:2px solid transparent;color:#9FB4AB;padding:11px 15px;font-size:13px;font-weight:500;white-space:nowrap;display:flex;gap:8px;align-items:center}
+.surftab i{font-style:normal;font-family:var(--mono);font-size:10.5px;opacity:.6}
+.surftab[aria-selected=true]{color:#fff;border-bottom-color:var(--brass)}
+
+.wrap{max-width:1420px;margin:0 auto;padding:22px 26px 60px}
+.surfintro{margin:4px 0 18px;max-width:760px}
+.surfintro h2{font-family:var(--serif);font-size:22px}
+.surfintro p{margin:6px 0 0;color:var(--muted);font-size:13px}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 16px;padding-bottom:2px}
+.chip{background:#fff;border:1px solid var(--line);color:var(--muted);padding:6px 12px;border-radius:99px;font-size:12.5px;display:flex;gap:7px;align-items:center}
+.chip u{text-decoration:none;font-family:var(--mono);font-size:10.5px;color:var(--brass)}
+.chip:hover{border-color:var(--forest2);color:var(--ink)}
+.chip[aria-selected=true]{background:var(--ink);border-color:var(--ink);color:#fff}
+.chip[aria-selected=true] u{color:var(--brass-soft)}
+
+/* screen shell */
+.screen{display:none}
+.screen.on{display:block}
+.surface{display:none}
+.surface.on{display:block}
+.scaption{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:baseline;margin:0 0 12px}
+.scaption h3{font-size:15.5px}
+.scaption .mod{font-family:var(--mono);font-size:11px;color:#fff;background:var(--forest);padding:3px 8px;border-radius:5px;letter-spacing:.02em}
+.scaption .exp{font-size:11.5px;color:var(--brass);border:1px solid var(--brass-soft);background:#FFFBF2;padding:3px 8px;border-radius:5px}
+.scaption p{margin:0;color:var(--muted);font-size:12.5px;flex:1 1 320px}
+
+/* ============ device frames ============ */
+.browser{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;box-shadow:var(--shadow)}
+.bbar{display:flex;gap:9px;align-items:center;padding:9px 12px;background:#F7F9F8;border-bottom:1px solid var(--line)}
+.dots{display:flex;gap:5px}.dots i{width:9px;height:9px;border-radius:99px;background:#D3DCD7;display:block}
+.url{flex:1;background:#fff;border:1px solid var(--line);border-radius:6px;padding:4px 10px;font-size:11.5px;color:var(--muted);font-family:var(--mono);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+
+.tablet{background:#14201C;border-radius:22px;padding:14px;box-shadow:var(--shadow)}
+.tablet .glass{background:#F4F6F4;border-radius:12px;overflow:hidden}
+.tablet .tlabel{color:#7E938B;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;padding:0 4px 9px;display:flex;justify-content:space-between}
+.phone{width:340px;background:#14201C;border-radius:30px;padding:11px;box-shadow:var(--shadow);flex:0 0 auto}
+.phone .glass{background:#fff;border-radius:22px;overflow:hidden}
+.notch{height:20px;display:grid;place-items:center}.notch i{width:74px;height:5px;border-radius:99px;background:#33443D;display:block}
+
+/* ============ admin app ============ */
+.app{display:grid;grid-template-columns:212px 1fr;min-height:660px}
+.topbar{grid-column:1/-1;display:flex;gap:14px;align-items:center;padding:9px 14px;background:var(--ink);color:#fff}
+.topbar .sbrand{font-size:12.5px;font-weight:600;display:flex;gap:8px;align-items:center}
+.topbar .sbrand em{font-style:normal;width:18px;height:18px;border-radius:4px;background:var(--brass);display:grid;place-items:center;color:#241a05;font-size:10px;font-weight:700}
+.topbar .gsearch{flex:1;max-width:420px;background:#1E3A31;border:1px solid #2E4E43;border-radius:7px;padding:5px 10px;font-size:12px;color:#9FB4AB}
+.topbar .who{margin-left:auto;font-size:11.5px;color:#9FB4AB;display:flex;gap:9px;align-items:center}
+.topbar .who b{background:var(--forest2);color:#fff;width:24px;height:24px;border-radius:99px;display:grid;place-items:center;font-size:10.5px}
+
+.nav{background:#F7F9F8;border-right:1px solid var(--line);padding:12px 9px}
+.nav .grp{font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted2);padding:10px 9px 6px}
+.nav a{display:flex;gap:9px;align-items:center;padding:7px 9px;border-radius:7px;font-size:13px;color:#31463E;text-decoration:none;margin-bottom:1px}
+.nav a svg{width:15px;height:15px;flex:0 0 15px;stroke:currentColor;fill:none;stroke-width:1.7;opacity:.75}
+.nav a.cur{background:#fff;color:var(--ink);font-weight:500;box-shadow:0 1px 2px rgba(15,34,27,.07);border:1px solid var(--line)}
+.nav a.cur svg{opacity:1;stroke:var(--forest2)}
+.nav a .pill{margin-left:auto;font-size:10px;background:var(--bad);color:#fff;border-radius:99px;padding:1px 6px;font-family:var(--mono)}
+
+.main{padding:20px 22px;background:#fff;min-width:0}
+.phead{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
+.phead h4{font-size:19px;font-family:var(--serif);font-weight:600}
+.phead .sub{font-size:12px;color:var(--muted);margin-top:3px}
+.acts{display:flex;gap:7px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:6px 12px;border-radius:7px;font-size:12.5px;font-weight:500}
+.btn:hover{border-color:var(--forest2)}
+.btn.p{background:var(--forest);border-color:var(--forest);color:#fff}
+.btn.p:hover{background:var(--forest2)}
+.btn.d{color:var(--bad);border-color:#EBC9C6}
+.btn.sm{padding:3px 9px;font-size:11.5px}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:10px;margin-bottom:18px}
+.kpi{border:1px solid var(--line);border-radius:var(--r);padding:13px 14px;background:#fff}
+.kpi .k{font-size:11.5px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.kpi .v{font-size:25px;font-family:var(--mono);font-weight:500;letter-spacing:-.02em;margin:7px 0 3px}
+.kpi .d{font-size:11.5px;color:var(--muted)}
+.kpi .d b{color:var(--ok);font-weight:500}
+.kpi.acc{background:linear-gradient(180deg,#FFFCF5,#fff);border-color:var(--brass-soft)}
+.kpi.acc .v{color:#7A5A18}
+
+.grid2{display:grid;grid-template-columns:1.55fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.card{border:1px solid var(--line);border-radius:var(--r);background:#fff;overflow:hidden}
+.card>h5{margin:0;padding:11px 14px;border-bottom:1px solid var(--line2);font-size:12.5px;font-weight:600;display:flex;justify-content:space-between;align-items:center;background:#FCFDFC}
+.card>h5 a{font-size:11.5px;color:var(--forest2);font-weight:500;text-decoration:none}
+.cbody{padding:14px}
+.cbody.tight{padding:0}
+
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted2);font-weight:600;padding:9px 12px;border-bottom:1px solid var(--line2);background:#FCFDFC;white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--line2);font-size:12.5px;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tbl-wrap{overflow-x:auto}
+.who2{display:flex;gap:9px;align-items:center}
+.av{width:26px;height:26px;border-radius:99px;background:var(--brass-soft);color:#6F5316;display:grid;place-items:center;font-size:10.5px;font-weight:600;flex:0 0 26px}
+.who2 b{font-weight:500;display:block}
+.who2 span{font-size:11px;color:var(--muted);font-family:var(--mono)}
+
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2.5px 8px;border-radius:99px;font-weight:500;white-space:nowrap}
+.tag:before{content:"";width:5px;height:5px;border-radius:99px;background:currentColor}
+.t-ok{background:var(--ok-bg);color:var(--ok)}
+.t-warn{background:var(--warn-bg);color:var(--warn)}
+.t-bad{background:var(--bad-bg);color:var(--bad)}
+.t-info{background:var(--info-bg);color:var(--info)}
+.t-mute{background:#EFF2F0;color:var(--muted)}
+.plus{color:var(--ok);font-weight:500}.minus{color:var(--bad);font-weight:500}
+
+.filters{display:flex;flex-wrap:wrap;gap:7px;padding:11px 14px;border-bottom:1px solid var(--line2);background:#FCFDFC;align-items:center}
+.inp{border:1px solid var(--line);border-radius:7px;padding:6px 10px;font-size:12.5px;background:#fff;color:var(--ink);min-width:120px}
+.inp.search{flex:1;min-width:200px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2383948D' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-4-4'/%3E%3C/svg%3E") no-repeat 9px 50%/14px;padding-left:29px}
+select.inp{appearance:none;padding-right:26px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2383948D' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 8px center/13px}
+.hint{font-size:11.5px;color:var(--muted)}
+.foot{padding:10px 14px;border-top:1px solid var(--line2);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted);background:#FCFDFC}
+.pager{display:flex;gap:4px}
+.pager b,.pager i{font-style:normal;border:1px solid var(--line);background:#fff;border-radius:6px;padding:2px 8px;font-size:11.5px;font-weight:400;font-family:var(--mono)}
+.pager b{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+/* customer detail */
+.cust-head{border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-wrap:wrap;gap:18px;align-items:center;background:linear-gradient(120deg,#FBFCFB,#fff)}
+.cust-head .av.big{width:48px;height:48px;flex:0 0 48px;font-size:16px}
+.cust-head dl{display:flex;flex-wrap:wrap;gap:0 26px;margin:0}
+.cust-head dt{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted2);margin-bottom:3px}
+.cust-head dd{margin:0 0 8px;font-size:12.5px}
+.balcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
+.bal{border:1px solid var(--line);border-radius:var(--r);padding:12px 13px}
+.bal .k{font-size:11px;color:var(--muted)}
+.bal .v{font-family:var(--mono);font-size:21px;margin-top:5px}
+.bal.gold{border-color:var(--brass-soft);background:#FFFCF5}
+.bal.gold .v{color:#7A5A18}
+.bal .n{font-size:11px;color:var(--muted);margin-top:3px}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:16px 0 0;overflow-x:auto}
+.tabs b,.tabs i{font-style:normal;font-weight:500;font-size:12.5px;padding:8px 13px;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.tabs b{color:var(--ink);border-bottom-color:var(--forest)}
+.progress{height:6px;border-radius:99px;background:#EAEFEC;overflow:hidden;margin-top:9px}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--brass),#D3A64A)}
+
+/* modal */
+.modal-stage{position:relative;background:#FBFCFB}
+.scrim{position:absolute;inset:0;background:rgba(15,34,27,.34);display:grid;place-items:center;padding:20px}
+.modal{background:#fff;border-radius:12px;width:100%;max-width:440px;box-shadow:0 20px 50px rgba(15,34,27,.3);overflow:hidden}
+.modal h5{margin:0;padding:13px 16px;border-bottom:1px solid var(--line2);font-size:13.5px;display:flex;justify-content:space-between}
+.modal .mb{padding:16px}
+.modal .mf{padding:12px 16px;border-top:1px solid var(--line2);display:flex;gap:8px;justify-content:flex-end;background:#FCFDFC}
+.field{margin-bottom:13px}
+.field label{display:block;font-size:11.5px;font-weight:500;margin-bottom:5px}
+.field label em{font-style:normal;color:var(--bad)}
+.field .inp{width:100%}
+.field .h{font-size:11px;color:var(--muted);margin-top:4px}
+.radios{display:flex;gap:7px}
+.radios span{flex:1;border:1px solid var(--line);border-radius:7px;padding:7px;text-align:center;font-size:12px}
+.radios span.on{border-color:var(--forest);background:#F1F7F4;font-weight:500;color:var(--forest)}
+.callout{border:1px solid var(--line);border-left:3px solid var(--brass);background:#FFFCF5;border-radius:8px;padding:11px 13px;font-size:12px;color:#4A4023}
+.callout b{color:#3A3319}
+.note{font-size:11.5px;color:var(--muted);margin-top:10px}
+.list-clean{margin:0;padding-left:17px;font-size:12.5px;color:var(--muted)}
+.list-clean li{margin-bottom:5px}
+.list-clean b{color:var(--ink);font-weight:500}
+
+/* settings */
+.setrow{display:grid;grid-template-columns:1fr 168px;gap:14px;align-items:center;padding:13px 0;border-bottom:1px solid var(--line2)}
+.setrow:last-child{border-bottom:0}
+.setrow .lab b{display:block;font-size:13px;font-weight:500}
+.setrow .lab span{font-size:11.5px;color:var(--muted)}
+.setrow .inp{width:100%}
+.preview{background:var(--ink);color:#DCE8E2;border-radius:var(--r);padding:14px;font-size:12.5px}
+.preview .big{font-family:var(--mono);font-size:19px;color:#fff;margin:6px 0}
+.preview .big em{font-style:normal;color:var(--brass)}
+.switch{width:36px;height:20px;border-radius:99px;background:var(--forest2);position:relative;display:inline-block}
+.switch:after{content:"";position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:99px;background:#fff}
+.switch.off{background:#CBD5D0}.switch.off:after{left:2px;right:auto}
+.rolegrid td:first-child{font-weight:500}
+.chk{width:14px;height:14px;border-radius:3px;border:1px solid var(--line);display:inline-block;vertical-align:-2px}
+.chk.on{background:var(--forest);border-color:var(--forest);position:relative}
+.chk.on:after{content:"";position:absolute;left:3.5px;top:1px;width:4px;height:8px;border:solid #fff;border-width:0 1.6px 1.6px 0;transform:rotate(40deg)}
+
+/* reports */
+.repcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:11px}
+.rep{border:1px solid var(--line);border-radius:var(--r);padding:13px;display:flex;flex-direction:column;gap:7px}
+.rep .n{font-family:var(--mono);font-size:11px;color:var(--brass)}
+.rep b{font-size:13px}
+.rep p{margin:0;font-size:11.5px;color:var(--muted);flex:1}
+.rep .x{display:flex;gap:6px}
+.bars{display:flex;align-items:flex-end;gap:10px;height:130px;padding:0 2px}
+.bars div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:5px;text-align:center}
+.bars i{display:block;border-radius:5px 5px 0 0;background:var(--forest2)}
+.bars i.b2{background:var(--brass)}
+.bars span{font-size:10.5px;color:var(--muted)}
+.legend{display:flex;gap:14px;font-size:11.5px;color:var(--muted);margin-top:11px}
+.legend em{font-style:normal;display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--forest2);margin-right:5px}
+.legend em.b2{background:var(--brass)}
+.donut{display:flex;gap:16px;align-items:center}
+.donut .ring{width:104px;height:104px;border-radius:99px;flex:0 0 104px;background:conic-gradient(var(--forest2) 0 71%,var(--brass-soft) 71% 100%);display:grid;place-items:center}
+.donut .ring i{width:74px;height:74px;background:#fff;border-radius:99px;display:grid;place-items:center;font-family:var(--mono);font-size:15px;font-style:normal}
+
+/* ============ POS ============ */
+.pos{display:grid;grid-template-columns:1fr 320px;min-height:600px;font-size:13px}
+.pos-main{padding:14px;background:#F4F6F4}
+.pos-top{display:flex;gap:10px;align-items:center;margin-bottom:12px}
+.pos-top .st{font-size:11.5px;color:var(--muted)}
+.pos-top .st b{display:block;font-size:13px;color:var(--ink)}
+.pos-search{flex:1;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 11px;color:var(--muted2);font-size:12.5px}
+.smartgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.tile{background:#fff;border:1px solid var(--line);border-radius:10px;padding:13px 11px;min-height:88px;display:flex;flex-direction:column;justify-content:space-between;font-size:12.5px;font-weight:500}
+.tile svg{width:19px;height:19px;stroke:var(--forest2);fill:none;stroke-width:1.7}
+.tile.loyal{background:linear-gradient(150deg,#1B4A38,#123328);border-color:#123328;color:#fff;position:relative}
+.tile.loyal svg{stroke:var(--brass)}
+.tile.loyal .badge{position:absolute;top:9px;right:9px;font-size:9.5px;background:var(--brass);color:#241a05;border-radius:99px;padding:1px 7px;font-family:var(--mono)}
+.cart{background:#fff;border-left:1px solid var(--line);display:flex;flex-direction:column}
+.cart h6{margin:0;padding:12px 14px;font-size:12.5px;border-bottom:1px solid var(--line2);display:flex;justify-content:space-between}
+.ci{padding:10px 14px;border-bottom:1px solid var(--line2);display:flex;justify-content:space-between;gap:10px;font-size:12.5px}
+.ci span{color:var(--muted);font-size:11px;display:block}
+.ci .mono{font-size:12.5px}
+.ci.disc{background:#F1F7F4}
+.ci.disc b{color:var(--ok)}
+.cart .sum{margin-top:auto;padding:13px 14px;border-top:1px solid var(--line);font-size:12.5px}
+.cart .sum div{display:flex;justify-content:space-between;margin-bottom:6px}
+.cart .sum .tot{font-size:16px;font-weight:600;font-family:var(--mono)}
+.cart .paybtn{margin:0 14px 14px;background:var(--forest);color:#fff;border:0;border-radius:9px;padding:13px;font-size:14px;font-weight:600;width:calc(100% - 28px)}
+.attached{margin:10px 14px 0;border:1px solid var(--brass-soft);background:#FFFCF5;border-radius:8px;padding:10px}
+.attached .r1{display:flex;gap:8px;align-items:center;font-size:12.5px;font-weight:500}
+.attached .r2{font-size:11px;color:var(--muted);margin-top:4px}
+
+.posmodal{position:absolute;inset:0;background:rgba(10,20,16,.42);display:grid;place-items:center;padding:22px}
+.pm{background:#fff;border-radius:14px;width:100%;max-width:520px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.pm h6{margin:0;padding:13px 16px;font-size:14px;border-bottom:1px solid var(--line2);display:flex;justify-content:space-between;align-items:center}
+.pm h6 em{font-style:normal;color:var(--muted);font-size:18px}
+.pm .pb{padding:16px}
+.pm .pf{padding:12px 16px;border-top:1px solid var(--line2);display:flex;gap:8px;background:#FCFDFC}
+.pm .pf .btn{flex:1;text-align:center;padding:11px}
+.seg{display:flex;gap:6px;margin-bottom:13px}
+.seg span{flex:1;text-align:center;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:12px;color:var(--muted)}
+.seg span.on{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:500}
+.bigfield{width:100%;border:1.5px solid var(--forest2);border-radius:9px;padding:12px 13px;font-size:15px;font-family:var(--mono)}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px}
+.keypad span{border:1px solid var(--line);border-radius:8px;padding:11px;text-align:center;font-family:var(--mono);font-size:15px;background:#FCFDFC}
+.res{border:1px solid var(--line);border-radius:9px;padding:11px;display:flex;gap:11px;align-items:center;margin-bottom:8px}
+.res.pick{border-color:var(--forest2);background:#F1F7F4}
+.res .txt{flex:1;min-width:0}
+.res b{font-size:13px;display:block}
+.res span{font-size:11.5px;color:var(--muted);display:block}
+.res .rt{text-align:right;font-size:11.5px}
+.vlist{border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-top:11px}
+.vrow{display:flex;gap:11px;align-items:center;padding:11px;border-bottom:1px solid var(--line2)}
+.vrow:last-child{border-bottom:0}
+.vrow .amt{font-family:var(--mono);font-size:17px;width:58px;color:#7A5A18}
+.vrow .txt{flex:1}.vrow .txt b{font-size:12.5px;display:block}.vrow .txt span{font-size:11px;color:var(--muted)}
+.vrow.dis{background:#FAFBFA;opacity:.75}
+.banner{border-radius:9px;padding:11px 13px;font-size:12.5px;display:flex;gap:9px;align-items:flex-start;margin-bottom:13px}
+.banner.ok{background:var(--ok-bg);color:#1E5236}
+.banner.bad{background:var(--bad-bg);color:#7E2C27}
+.banner.warn{background:var(--warn-bg);color:#6B520F}
+.banner b{display:block}
+.banner svg{width:17px;height:17px;flex:0 0 17px;stroke:currentColor;fill:none;stroke-width:2}
+
+/* journey flow */
+.flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:12px;counter-reset:s}
+.step{border:1px solid var(--line);border-radius:var(--r);background:#fff;padding:14px;position:relative}
+.step .n{font-family:var(--mono);font-size:11px;color:var(--brass);margin-bottom:6px}
+.step b{display:block;font-size:13px;margin-bottom:5px}
+.step p{margin:0;font-size:11.5px;color:var(--muted)}
+.step .who{margin-top:9px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--forest2)}
+.swimlane{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:#fff;margin-top:14px}
+.lane{display:grid;grid-template-columns:132px 1fr;border-bottom:1px solid var(--line2)}
+.lane:last-child{border-bottom:0}
+.lane .lh{background:#FCFDFC;border-right:1px solid var(--line2);padding:13px;font-size:11.5px;font-weight:600}
+.lane .lh span{display:block;font-weight:400;color:var(--muted);font-size:11px;margin-top:3px}
+.lane .lb{padding:12px;display:flex;flex-wrap:wrap;gap:7px}
+.node{border:1px solid var(--line);border-radius:99px;padding:5px 12px;font-size:11.5px;background:#FCFDFC}
+.node.k{background:var(--ink);color:#fff;border-color:var(--ink)}
+.node.g{background:#FFFCF5;border-color:var(--brass-soft);color:#7A5A18}
+
+/* member portal */
+.mrow{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start}
+.msite{flex:1;min-width:300px}
+.sitebar{background:var(--ink);color:#fff;padding:11px 16px;display:flex;gap:14px;align-items:center;font-size:12.5px}
+.sitebar b{font-family:var(--serif);font-size:15px;margin-right:auto}
+.sitebar span{color:#9FB4AB}
+.mbody{padding:20px}
+.acctnav{display:flex;gap:3px;border-bottom:1px solid var(--line);margin-bottom:18px;overflow-x:auto}
+.acctnav b,.acctnav i{font-style:normal;font-weight:500;font-size:12.5px;padding:9px 12px;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.acctnav b{color:var(--ink);border-bottom-color:var(--brass)}
+.voucherhero{background:linear-gradient(140deg,#1B4A38,#0F2B21);border-radius:14px;padding:22px;color:#fff;position:relative;overflow:hidden}
+.voucherhero:after{content:"";position:absolute;right:-40px;top:-40px;width:170px;height:170px;border-radius:99px;background:radial-gradient(circle,rgba(176,132,47,.4),transparent 70%)}
+.voucherhero .lab{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#9FB4AB}
+.voucherhero .amt{font-family:var(--mono);font-size:46px;font-weight:500;letter-spacing:-.03em;margin:7px 0 3px}
+.voucherhero .sub{font-size:12.5px;color:#C3D3CC;max-width:330px}
+.voucherhero .cta{margin-top:15px;background:var(--brass);border:0;color:#241a05;font-weight:600;padding:10px 17px;border-radius:8px;font-size:13px}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:11px;margin-top:14px}
+.vcard{border:1px dashed var(--brass);border-radius:12px;padding:14px;background:#FFFCF5;position:relative}
+.vcard .amt{font-family:var(--mono);font-size:27px;color:#7A5A18}
+.vcard .t{font-size:12px;font-weight:500;margin:3px 0}
+.vcard .e{font-size:11px;color:var(--muted)}
+.vcard.bday{border-color:#B0842F;background:linear-gradient(140deg,#FFF8E8,#FFFDF7)}
+.vcard .rib{position:absolute;top:11px;right:11px;font-size:10px;background:var(--brass);color:#241a05;padding:1.5px 7px;border-radius:99px;font-weight:600}
+.digicard{background:linear-gradient(140deg,#1B4A38,#0C231B);border-radius:16px;padding:18px;color:#fff}
+.digicard .top{display:flex;justify-content:space-between;align-items:flex-start;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#9FB4AB}
+.digicard .nm{font-size:16px;margin:22px 0 3px;font-weight:500}
+.digicard .no{font-family:var(--mono);font-size:15px;letter-spacing:.14em;color:#E2C889}
+.barcode{background:#fff;border-radius:9px;padding:11px;margin-top:14px;display:flex;flex-direction:column;align-items:center;gap:7px}
+.barcode .bars2{display:flex;gap:2px;height:46px;align-items:stretch}
+.barcode .bars2 i{background:#0F221B;display:block}
+.barcode small{font-family:var(--mono);font-size:10.5px;color:#5E7069;letter-spacing:.18em}
+.stepbar{display:flex;gap:6px;margin-bottom:16px}
+.stepbar span{flex:1;height:3px;border-radius:99px;background:#E4EAE7}
+.stepbar span.on{background:var(--forest2)}
+.mailwrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.mail{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:#fff}
+.mail .mh{padding:9px 12px;border-bottom:1px solid var(--line2);font-size:11px;color:var(--muted);background:#FCFDFC}
+.mail .mh b{display:block;color:var(--ink);font-size:12px;font-weight:500;margin-top:2px}
+.mail .mc{padding:14px;text-align:center}
+.mail .mc .big{font-family:var(--mono);font-size:23px;color:#7A5A18;margin:6px 0}
+.mail .mc p{margin:0;font-size:11.5px;color:var(--muted)}
+.mail .trig{padding:9px 12px;border-top:1px solid var(--line2);font-size:10.5px;color:var(--forest2);background:#FCFDFC;font-family:var(--mono)}
+
+.legendbar{display:flex;flex-wrap:wrap;gap:8px 18px;margin:18px 0 0;padding:13px 15px;border:1px solid var(--line);border-radius:var(--r);background:#fff;font-size:11.5px;color:var(--muted)}
+.legendbar b{color:var(--ink);font-weight:500}
+.foot-note{margin-top:22px;font-size:11.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}
+
+@media(max-width:1100px){
+  .app{grid-template-columns:1fr}
+  .nav{display:flex;gap:5px;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:9px}
+  .nav .grp{display:none}.nav a{white-space:nowrap;margin:0}
+  .grid2,.grid3,.pos{grid-template-columns:1fr}
+  .smartgrid{grid-template-columns:repeat(3,1fr)}
+  .cart{border-left:0;border-top:1px solid var(--line)}
+}
+@media(max-width:620px){.smartgrid{grid-template-columns:repeat(2,1fr)}.phone{width:100%}}
+
+@media print{
+  body{background:#fff}
+  .pagehead{background:#fff;color:#000;border-bottom:1px solid #ccc}
+  .brand span,.meta{color:#555}.printbtn,.surftabs,.chips{display:none}
+  .surface,.screen{display:block!important;break-inside:avoid}
+  .screen{margin-bottom:26px}
+  .browser,.tablet,.phone,.card{box-shadow:none}
+}
+body.print-all .surface,body.print-all .screen{display:block!important}
+body.print-all .screen{margin-bottom:30px}
+</style>
+
+<div class="pagehead">
+  <div class="row">
+    <div class="brand">
+      <div class="crest">P</div>
+      <div>
+        <b>OSC Privilege Club</b>
+        <span>Illustrative UI Structure &middot; v1.1</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:14px;align-items:flex-end">
+      <div class="meta">
+        Prepared by <b>Dotsquares</b> for <b>Robert / OSC</b> &middot; Lead 22530<br>
+        Aligned to Proposal v1.1 &middot; indicative structure, not final visual design
+      </div>
+      <button class="printbtn" onclick="document.body.classList.toggle('print-all');window.print()">Save as PDF</button>
+    </div>
+  </div>
+  <div class="surftabs" role="tablist">
+    <button class="surftab" role="tab" aria-selected="true" data-surf="admin"><i>A</i> Shopify Admin App</button>
+    <button class="surftab" role="tab" aria-selected="false" data-surf="pos"><i>B</i> Shopify POS Pro</button>
+    <button class="surftab" role="tab" aria-selected="false" data-surf="member"><i>C</i> Member Portal &amp; Comms</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- ══════════════════════════ SURFACE A — ADMIN ══════════════════════════ -->
+<section class="surface on" id="s-admin">
+  <div class="surfintro">
+    <h2>A. Shopify Admin — embedded loyalty app</h2>
+    <p>Runs inside OSC's own Shopify Admin. Left-hand navigation covers the eight areas below; every screen is tagged with the proposal module it delivers.</p>
+  </div>
+
+  <div class="chips" role="tablist" data-for="admin">
+    <button class="chip" role="tab" aria-selected="true" data-scr="a1"><u>A1</u> Dashboard</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="a2"><u>A2</u> Customers — list</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="a3"><u>A3</u> Customer profile</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="a4"><u>A4</u> Adjust points</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="a5"><u>A5</u> Loyalty &amp; ledger</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="a6"><u>A6</u> Voucher management</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="a7"><u>A7</u> Transactions</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="a8"><u>A8</u> Reports</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="a9"><u>A9</u> Migration report</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="a10"><u>A10</u> Settings — rules</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="a12"><u>A12</u> Audit log</button>
+  </div>
+
+  <!-- ---------- A1 Dashboard ---------- -->
+  <div class="screen on" id="a1">
+    <div class="scaption">
+      <span class="mod">Module 1 + 7</span><h3>Dashboard</h3>
+      <span class="exp">Expectation 1, 9</span>
+      <p>Programme health at a glance, plus the things that need someone's attention today.</p>
+    </div>
+    <div class="browser">
+      <div class="bbar"><span class="dots"><i></i><i></i><i></i></span><span class="url">admin.shopify.com/store/osc/apps/privilege-club</span></div>
+      <div class="app">
+        <!--TOPBAR--><div class="topbar"><span class="sbrand"><em>P</em> Privilege Club</span><span class="gsearch">Search members, cards, vouchers…</span><span class="who"><span>OSC Salisbury HQ</span><b>NM</b></span></div>
+        <nav class="nav" data-nav="1"></nav>
+        <div class="main">
+          <div class="phead">
+            <div><h4>Dashboard</h4><div class="sub">Live figures &middot; 13 Aug 2026, 09:42</div></div>
+            <div class="acts"><select class="inp"><option>Last 30 days</option><option>This month</option><option>Last 12 months</option></select><button class="btn">Export summary</button></div>
+          </div>
+          <div class="kpis">
+            <div class="kpi"><div class="k">Total members</div><div class="v">41,286</div><div class="d">28,904 active &middot; 12,382 lapsed</div></div>
+            <div class="kpi"><div class="k">New sign-ups (30d)</div><div class="v">612</div><div class="d"><b>+18%</b> &middot; 397 online / 215 in-store</div></div>
+            <div class="kpi"><div class="k">Points issued (30d)</div><div class="v">184,520</div><div class="d">All qualifying items</div></div><div class="kpi"><div class="k">Pending points</div><div class="v">42,180</div><div class="d">Clearing over the next 30 days</div></div>
+            <div class="kpi acc"><div class="k">Voucher value outstanding</div><div class="v">£38,415</div><div class="d">7,683 vouchers unredeemed</div></div>
+            <div class="kpi"><div class="k">Redemption rate (30d)</div><div class="v">42%</div><div class="d">£16,120 redeemed</div></div>
+          </div>
+          <div class="grid2-1">
+            <div class="card"><h5>Recent loyalty activity <a href="#">View all transactions</a></h5>
+              <div class="cbody tight"><div class="tbl-wrap"><table>
+                <tr><th>Member</th><th>Action</th><th>Channel</th><th class="num">Points</th><th>Reference</th><th>Time</th></tr>
+                <tr><td class="who2"><span class="av">MW</span><span><b>M. Whitfield</b><span>0041-2287</span></span></td><td>Earned <span class="tag t-warn">Pending</span></td><td><span class="tag t-info">Salisbury</span></td><td class="num plus">+72</td><td class="mono">#POS-8841</td><td>09:31</td></tr>
+                <tr><td class="who2"><span class="av">JD</span><span><b>J. Dhillon</b><span>0058-1190</span></span></td><td>Voucher redeemed</td><td><span class="tag t-mute">Online</span></td><td class="num minus">−200</td><td class="mono">#10482</td><td>09:19</td></tr>
+                <tr><td class="who2"><span class="av">RP</span><span><b>R. Peterson</b><span>NEW-77213</span></span></td><td>Enrolled</td><td><span class="tag t-info">Andover</span></td><td class="num">—</td><td class="mono">Till 2 &middot; Ellie R.</td><td>09:04</td></tr>
+                <tr><td class="who2"><span class="av">SB</span><span><b>S. Bright</b><span>0032-4410</span></span></td><td>Birthday reward issued</td><td><span class="tag t-mute">Automatic</span></td><td class="num">£10</td><td class="mono">BDAY-2026-0912</td><td>06:00</td></tr>
+                <tr><td class="who2"><span class="av">AK</span><span><b>A. Kaur</b><span>0067-3325</span></span></td><td>Refund reversal</td><td><span class="tag t-info">Winchester</span></td><td class="num minus">−32</td><td class="mono">#POS-8790</td><td>08:47</td></tr>
+              </table></div></div>
+            </div>
+        
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- A2 Customers list ---------- -->
+  <div class="screen" id="a2">
+    <div class="scaption"><span class="mod">Module 2 + 8</span><h3>Customers — search &amp; list</h3><span class="exp">Expectation 3, 6</span>
+      <p>Email is the primary identifier. Name, postcode and card numbers — new or legacy Dynamics — are all searchable.</p></div>
+    <div class="browser">
+      <div class="bbar"><span class="dots"><i></i><i></i><i></i></span><span class="url">…/apps/privilege-club/customers</span></div>
+      <div class="app">
+        <div class="topbar"><span class="sbrand"><em>P</em> Privilege Club</span><span class="gsearch">Search members, cards, vouchers…</span><span class="who"><span>OSC Salisbury HQ</span><b>NM</b></span></div>
+        <nav class="nav" data-nav="2"></nav>
+        <div class="main">
+          <div class="phead"><div><h4>Customers</h4><div class="sub">41,286 members</div></div>
+            <div class="acts"><button class="btn">Export CSV</button><button class="btn p">Enrol member</button></div></div>
+          <div class="card">
+            <div class="filters">
+              <span class="inp search">whitfield</span>
+              <select class="inp"><option>Search: all fields</option><option>Email — primary identifier</option><option>Name</option><option>Postcode</option><option>Card number (new)</option><option>Legacy card number</option></select>
+              <select class="inp"><option>Segment: all</option><option>Active</option><option>Lapsed</option></select>
+              <select class="inp"><option>Enrolled: any channel</option><option>Online</option><option>In-store</option><option>Migrated</option></select>
+              <span class="hint">3 results</span>
+            </div>
+            <div class="tbl-wrap"><table>
+              <tr><th>Member</th><th>Email — primary ID</th><th>Postcode</th><th>Card no.</th><th>Legacy card</th><th class="num">Available</th><th class="num">Pending</th><th class="num">Voucher value</th><th>Segment</th><th></th></tr>
+              <tr><td class="who2"><span class="av">MW</span><span><b>Margaret Whitfield</b><span>joined 14 Mar 2019</span></span></td><td class="mono">m.whitfield@example.co.uk</td><td class="mono">SP4 6AB</td><td class="mono">0041-2287</td><td class="mono">D-118422</td><td class="num">340</td><td class="num">72</td><td class="num">£15</td><td><span class="tag t-ok">Active</span></td><td><button class="btn sm">Open</button></td></tr>
+              <tr><td class="who2"><span class="av">TW</span><span><b>Thomas Whitfield</b><span>joined 02 Jun 2024</span></span></td><td class="mono">tomw@example.co.uk</td><td class="mono">SP4 6AB</td><td class="mono">0041-2288</td><td class="mono">—</td><td class="num">85</td><td class="num">0</td><td class="num">£0</td><td><span class="tag t-ok">Active</span></td><td><button class="btn sm">Open</button></td></tr>
+              <tr><td class="who2"><span class="av">EW</span><span><b>Eileen Whitfield</b><span>joined 08 Sep 2016</span></span></td><td><span class="tag t-bad">No email held</span></td><td class="mono">BH21 4RG</td><td class="mono">0019-7740</td><td class="mono">D-090311</td><td class="num">1,120</td><td class="num">0</td><td class="num">£55</td><td><span class="tag t-warn">Lapsed</span></td><td><button class="btn sm">Open</button></td></tr>
+            </table></div>
+            <div class="foot"><span>Email is the primary customer identifier. Postcode and name are supporting fields for lookup and duplicate validation.</span><span class="pager"><i>‹</i><b>1</b><i>›</i></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- A3 Customer profile ---------- -->
+  <div class="screen" id="a3">
+    <div class="scaption"><span class="mod">Module 2 + 4 + 8</span><h3>Customer profile — full loyalty record</h3><span class="exp">Expectation 3, 5</span>
+      <p>One unified record keyed on email: contact details, card numbers, available and pending balances, vouchers and every ledger movement.</p></div>
+    <div class="browser">
+      <div class="bbar"><span class="dots"><i></i><i></i><i></i></span><span class="url">…/customers/0041-2287</span></div>
+      <div class="app">
+        <div class="topbar"><span class="sbrand"><em>P</em> Privilege Club</span><span class="gsearch">Search members, cards, vouchers…</span><span class="who"><span>OSC Salisbury HQ</span><b>NM</b></span></div>
+        <nav class="nav" data-nav="2"></nav>
+        <div class="main">
+          <div class="phead"><div><h4>Margaret Whitfield</h4><div class="sub">Member since 14 Mar 2019 &middot; migrated from Dynamics</div></div>
+            <div class="acts"><button class="btn">Adjust points</button><button class="btn">Issue voucher</button><button class="btn">View in Shopify</button></div></div>
+
+          <div class="cust-head">
+            <span class="av big">MW</span>
+            <dl>
+              <div><dt>Email — primary identifier</dt><dd class="mono">m.whitfield@example.co.uk</dd></div>
+              <div><dt>Mobile</dt><dd class="mono">07700 900 118</dd></div>
+              <div><dt>Postcode — supporting</dt><dd class="mono">SP4 6AB</dd></div>
+              <div><dt>Date of birth</dt><dd>12 Sep 1958</dd></div>
+              <div><dt>Card number</dt><dd class="mono">0041-2287</dd></div>
+              <div><dt>Legacy card</dt><dd class="mono">D-118422</dd></div>
+              <div><dt>Segment</dt><dd><span class="tag t-ok">Active</span></dd></div>
+              <div><dt>Marketing consent</dt><dd><span class="tag t-ok">Opted in</span> synced to Klaviyo</dd></div>
+            </dl>
+          </div>
+
+          <div class="balcards">
+            <div class="bal"><div class="k">Available points (backend)</div><div class="v">340</div><div class="n">Not shown to the customer</div></div>
+            <div class="bal" style="border-color:var(--warn-bg);background:#FEFBF3"><div class="k">Pending points</div><div class="v" style="color:var(--warn)">72</div><div class="n">Clears 12 Sep 2026 &middot; 30-day period</div></div>
+            <div class="bal gold"><div class="k">Available voucher value</div><div class="v">£15</div><div class="n">300 pts used &middot; 40 pts carried forward</div></div>
+            <div class="bal"><div class="k">Points to next £5</div><div class="v">60</div><div class="n"><span class="progress"><i style="width:40%"></i></span></div></div>
+            <div class="bal"><div class="k">Lifetime spend</div><div class="v">£4,182</div><div class="n">Last purchase 09 Aug 2026</div></div>
+          </div>
+
+          <div class="tabs"><b>Points ledger</b><i>Vouchers (3)</i></div>
+          <div class="card" style="border-top:0;border-radius:0 0 var(--r) var(--r)">
+            <div class="tbl-wrap"><table>
+              <tr><th>Date &amp; time</th><th>Type</th><th>Detail</th><th>Status</th><th>Channel / staff</th><th>Reference</th><th class="num">Points</th><th class="num">Available</th></tr>
+              <tr><td class="mono">13 Aug 09:31</td><td>Earn</td><td>Qualifying spend £72.40 (all lines earn)</td><td><span class="tag t-warn">Pending to 12 Sep</span></td><td>Salisbury &middot; Ellie R.</td><td class="mono">#POS-8841</td><td class="num plus">+72</td><td class="num">340</td></tr>
+              <tr><td class="mono">09 Aug 14:02</td><td>Redemption</td><td>£10 redeemed in £5 increments at checkout</td><td><span class="tag t-ok">Applied</span></td><td>Online</td><td class="mono">#10466</td><td class="num minus">−200</td><td class="num">292</td></tr>
+              <tr><td class="mono">02 Aug 11:20</td><td>Adjustment</td><td>Goodwill — damaged plant replacement</td><td><span class="tag t-ok">Available</span></td><td>Admin &middot; N. Mehra</td><td class="mono">ADJ-2261</td><td class="num plus">+50</td><td class="num">492</td></tr>
+              <tr><td class="mono">28 Jul 16:44</td><td>Reversal</td><td>Partial refund of #POS-8612 — taken from pending</td><td><span class="tag t-ok">Applied</span></td><td>Salisbury &middot; Ellie R.</td><td class="mono">#POS-8612-R</td><td class="num minus">−26</td><td class="num">442</td></tr>
+              <tr><td class="mono">12 Jul 06:00</td><td>Expiry</td><td>Points earned 12 Jan 2026 expired (6 months)</td><td><span class="tag t-mute">Expired</span></td><td>Automatic</td><td class="mono">EXP-0712</td><td class="num minus">−80</td><td class="num">468</td></tr>
+              <tr><td class="mono">12 Sep 06:00</td><td>Birthday reward</td><td>£10 birthday voucher issued</td><td><span class="tag t-ok">Available</span></td><td>Automatic</td><td class="mono">BDAY-2025-0912</td><td class="num">—</td><td class="num">548</td></tr>
+            </table></div>
+            <div class="foot"><span>Every movement is an immutable ledger entry — nothing is edited in place.</span><span class="pager"><i>‹</i><b>1</b><i>2</i><i>›</i></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- A4 Adjust points modal ---------- -->
+  <div class="screen" id="a4">
+    <div class="scaption"><span class="mod">Module 8</span><h3>Manual points adjustment — reason required</h3><span class="exp">Expectation 7, 10</span>
+      <p>Reason capture is mandatory; the adjustment and the person who made it are written to the audit log.</p></div>
+    <div class="browser">
+      <div class="bbar"><span class="dots"><i></i><i></i><i></i></span><span class="url">…/customers/0041-2287 — adjust points</span></div>
+      <div class="app">
+        <div class="topbar"><span class="sbrand"><em>P</em> Privilege Club</span><span class="gsearch">Search members, cards, vouchers…</span><span class="who"><span>OSC Salisbury HQ</span><b>NM</b></span></div>
+        <nav class="nav" data-nav="2"></nav>
+        <div class="main modal-stage">
+          <div class="phead"><div><h4>Margaret Whitfield</h4><div class="sub">340 points &middot; £15 available</div></div></div>
+          <div class="balcards"><div class="bal"><div class="k">Points balance</div><div class="v">340</div></div><div class="bal gold"><div class="k">Voucher value</div><div class="v">£15</div></div></div>
+          <div class="scrim">
+            <div class="modal">
+              <h5>Adjust points <span style="color:var(--muted)">✕</span></h5>
+              <div class="mb">
+                <div class="field"><label>Adjustment type</label>
+                  <div class="radios"><span class="on">Add points</span><span>Deduct points</span></div></div>
+                <div class="field"><label>Points <em>*</em></label><span class="inp mono" style="display:block">50</span>
+                  <div class="h">New balance will be 390 points → £15 available (40 pts carried forward)</div></div>
+                <div class="field"><label>Reason category <em>*</em></label>
+                  <select class="inp"><option>Goodwill gesture</option><option>Correction — missed earning</option><option>Correction — duplicate earning</option><option>Migration correction</option><option>Other (describe below)</option></select></div>
+                <div class="field"><label>Notes <em>*</em></label><span class="inp" style="display:block;min-height:52px;color:var(--muted)">Replacement for damaged acer, agreed with store manager (case #4471).</span>
+                  <div class="h">Minimum 10 characters. Visible in the audit log and on the member's record.</div></div>
+                <div class="callout">Recorded as <b>N. Mehra</b> &middot; 13 Aug 2026 09:44 &middot; reference will be generated as <b>ADJ-2262</b>.</div>
+              </div>
+              <div class="mf"><button class="btn">Cancel</button><button class="btn p">Save adjustment</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- A5 Loyalty & ledger ---------- -->
+  <div class="screen" id="a5">
+    <div class="scaption"><span class="mod">Module 1</span><h3>Loyalty — programme ledger &amp; expiry queue</h3><span class="exp">Expectation 1, 10</span>
+      <p>The engine's own view: every movement across the programme, what is still pending, and what the scheduled expiry job will process next.</p></div>
+    <div class="browser">
+      <div class="bbar"><span class="dots"><i></i><i></i><i></i></span><span class="url">…/apps/privilege-club/loyalty</span></div>
+      <div class="app">
+        <div class="topbar"><span class="sbrand"><em>P</em> Privilege Club</span><span class="gsearch">Search members, cards, vouchers…</span><span class="who"><span>OSC Salisbury HQ</span><b>NM</b></span></div>
+        <nav class="nav" data-nav="3"></nav>
+        <div class="main">
+          <div class="phead"><div><h4>Loyalty</h4><div class="sub">Points ledger, earning rules in force, expiry schedule</div></div>
+            <div class="acts"><button class="btn">Export ledger</button><button class="btn">Rules settings</button></div></div>
+          <div class="kpis">
+            <div class="kpi"><div class="k">Points in circulation</div><div class="v">2.41m</div><div class="d">≈ £120,500 of voucher value</div></div>
+            <div class="kpi"><div class="k">Earned today</div><div class="v">6,140</div><div class="d">£6,140 qualifying spend</div></div><div class="kpi"><div class="k">Pending (not yet available)</div><div class="v">42,180</div><div class="d">30-day period &middot; oldest clears 14 Aug</div></div>
+            <div class="kpi"><div class="k">Expiring in 30 days</div><div class="v">18,240</div><div class="d">Next run 14 Aug, 03:00</div></div>
+            <div class="kpi"><div class="k">Reversals today</div><div class="v">−214</div><div class="d">7 refunds &middot; 1 cancellation</div></div>
+          </div>
+          <div class="grid2">
+            <div class="card"><h5>Programme ledger <a href="#">Filters</a></h5><div class="tbl-wrap"><table>
+              <tr><th>Time</th><th>Member</th><th>Type</th><th>Channel</th><th class="num">Delta</th></tr>
+              <tr><td class="mono">09:31</td><td>M. Whitfield</td><td>Earn</td><td>Salisbury</td><td class="num plus">+48</td></tr>
+              <tr><td class="mono">09:28</td><td>P. Osei</td><td>Earn</td><td>Online</td><td class="num plus">+112</td></tr>
+              <tr><td class="mono">09:19</td><td>J. Dhillon</td><td>Redemption</td><td>Online</td><td class="num minus">−200</td></tr>
+              <tr><td class="mono">08:58</td><td>L. Grant</td><td>Earn (partial)</td><td>Andover</td><td class="num plus">+21</td></tr>
+              <tr><td class="mono">08:47</td><td>A. Kaur</td><td>Reversal</td><td>Winchester</td><td class="num minus">−32</td></tr>
+              <tr><td class="mono">03:00</td><td>Batch — 412 members</td><td>Expiry</td><td>Automatic</td><td class="num minus">−9,880</td></tr>
+            </table></div></div>
+            <div>
+              <div class="card" style="margin-bottom:12px"><h5>Rules currently in force</h5><div class="cbody">
+                <ul class="list-clean">
+                  <li><b>£1 = 1 point</b> on all qualifying items — including sale, discounted and promotional</li>
+                  <li>Points stay <b>pending for 30 days</b> before becoming available</li>
+                  <li><b>100 points = £5</b> voucher value, rounded down</li>
+                  <li>Redemption capped at <b>£50 per order</b>, in £5 increments</li>
+                  <li>Voucher spend must be <b>less than the basket value</b></li>
+                  <li><b>£10</b> birthday reward, once per year</li>
+                  <li>Points expire <b>6 months</b> after earning</li>
+                  <li>Vouchers expire <b>6 months</b> after issue</li>
+                </ul>
+                <div class="note">Changed only from Settings → Rules, by an authorised role, and logged.</div>
+              </div></div>
+              <div class="card"><h5>Redemption controls</h5><div class="cbody"><ul class="list-clean">
+                <li><b>Minimum basket spend</b> before a voucher can be used</li>
+                <li><b>Maximum £50 per order</b> (configurable)</li>
+                <li>Redeemable amount <b>rounded down to £5</b></li>
+                <li>Voucher spend must stay <b>below the basket total</b></li>
+                <li><b>Excluded products</b> reduce the eligible portion</li>
+                <li>Same rules apply <b>online and at POS</b></li>
+              </ul>
+              <div class="note">Earning now applies to all qualifying items. Exclusions apply to <b>redemption</b>, not earning.</div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- A6 Voucher management ---------- -->
+  <div class="screen" id="a6">
+    <div class="scaption"><span class="mod">Module 4 + 8</span><h3>Voucher management</h3><span class="exp">Expectation 5, 7</span>
+      <p>Create, monitor, cancel and reissue vouchers, filtered by status, expiry window or member.</p></div>
+    <div class="browser">
+      <div class="bbar"><span class="dots"><i></i><i></i><i></i></span><span class="url">…/apps/privilege-club/vouchers</span></div>
+      <div class="app">
+        <div class="topbar"><span class="sbrand"><em>P</em> Privilege Club</span><span class="gsearch">Search members, cards, vouchers…</span><span class="who"><span>OSC Salisbury HQ</span><b>NM</b></span></div>
+        <nav class="nav" data-nav="4"></nav>
+        <div class="main">
+          <div class="phead"><div><h4>Voucher management</h4><div class="sub">7,683 active &middot; £38,415 outstanding</div></div>
+            <div class="acts"><button class="btn">Export CSV</button><button class="btn p">Issue voucher</button></div></div>
+          <div class="kpis">
+            <div class="kpi acc"><div class="k">Active</div><div class="v">7,683</div><div class="d">£38,415 value</div></div>
+            <div class="kpi"><div class="k">Redeemed (30d)</div><div class="v">3,224</div><div class="d">£16,120</div></div>
+            <div class="kpi"><div class="k">Expiring in 30 days</div><div class="v">918</div><div class="d">Reminder flow armed</div></div>
+            <div class="kpi"><div class="k">Cancelled / reissued</div><div class="v">42</div><div class="d">All reason-logged</div></div>
+          </div>
+          <div class="card" style="margin-bottom:14px"><h5>How the redemption cap is calculated</h5><div class="cbody">
+            <div class="grid2" style="grid-template-columns:1fr 1fr;gap:16px">
+              <div><ul class="list-clean">
+                <li>Basket total <b>£100</b></li>
+                <li>Eligible products <b>£60</b></li>
+                <li>Excluded products <b>£40</b></li>
+                <li>Member's available voucher value <b>£50</b></li>
+              </ul></div>
+              <div class="callout"><b>Redeemable: £55 → capped at £50.</b> The cap is calculated against the £60 eligible portion, then the £50 per-order maximum applies, rounded down to £5. Voucher spend must remain below the basket total. Unused value stays on the account.
+              <div class="note" style="margin-top:8px">Business-rule assumption per proposal v1.1 — final behaviour confirmed at technical specification.</div></div>
+            </div>
+          </div></div>
+          <div class="card">
+            <div class="filters">
+              <span class="inp search">Search voucher code, member, card number…</span>
+              <select class="inp"><option>Status: all</option><option>Active</option><option>Redeemed</option><option>Expired</option><option>Cancelled</option></select>
+              <select class="inp"><option>Type: all</option><option>Points voucher</option><option>Birthday reward</option><option>Goodwill</option></select>
+              <select class="inp"><option>Expiry: any</option><option>Next 7 days</option><option>Next 30 days</option></select>
+              <span class="hint">Showing 1–6 of 7,683</span>
+            </div>
+            <div class="tbl-wrap"><table>
+              <tr><th>Voucher code</th><th>Member</th><th class="num">Value</th><th>Type</th><th>Issued</th><th>Expires</th><th>Status</th><th>Actions</th></tr>
+              <tr><td class="mono">PC-5F2A-9911</td><td>M. Whitfield &middot; <span class="mono">0041-2287</span></td><td class="num">£10</td><td>Points voucher</td><td>02 Jul 2026</td><td>02 Jan 2027</td><td><span class="tag t-ok">Active</span></td><td><button class="btn sm">Cancel</button></td></tr>
+              <tr><td class="mono">PC-5F2A-9912</td><td>M. Whitfield &middot; <span class="mono">0041-2287</span></td><td class="num">£5</td><td>Points voucher</td><td>28 Jul 2026</td><td>28 Jan 2027</td><td><span class="tag t-ok">Active</span></td><td><button class="btn sm">Cancel</button></td></tr>
+              <tr><td class="mono">BD-1180-4432</td><td>S. Bright &middot; <span class="mono">0032-4410</span></td><td class="num">£10</td><td>Birthday reward</td><td>12 Aug 2026</td><td>12 Sep 2026</td><td><span class="tag t-warn">Expires soon</span></td><td><button class="btn sm">Reissue</button></td></tr>
+              <tr><td class="mono">PC-4B71-2280</td><td>J. Dhillon &middot; <span class="mono">0058-1190</span></td><td class="num">£10</td><td>Points voucher</td><td>19 Jun 2026</td><td>—</td><td><span class="tag t-info">Redeemed</span></td><td><button class="btn sm">View order</button></td></tr>
+              <tr><td class="mono">PC-3312-7714</td><td>E. Whitfield &middot; <span class="mono">0019-7740</span></td><td class="num">£5</td><td>Points voucher</td><td>03 Jan 2026</td><td>03 Jul 2026</td><td><span class="tag t-mute">Expired</span></td><td><button class="btn sm">Reissue</button></td></tr>
+              <tr><td class="mono">GW-9021-5567</td><td>A. Kaur &middot; <span class="mono">0067-3325</span></td><td class="num">£5</td><td>Goodwill</td><td>07 Aug 2026</td><td>07 Feb 2027</td><td><span class="tag t-bad">Cancelled</span></td><td><button class="btn sm">Reason</button></td></tr>
+            </table></div>
+            <div class="foot"><span>Redemption runs in £5 increments, capped at £50 per order. Cancel and reissue require a reason and appear in the audit log.</span><span class="pager"><i>‹</i><b>1</b><i>2</i><i>3</i><i>›</i></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- A7 Transactions ---------- -->
+  <div class="screen" id="a7">
+    <div class="scaption"><span class="mod">Module 1 + 3</span><h3>Transactions</h3><span class="exp">Expectation 1, 9</span>
+      <p>Every loyalty-affecting order, online and in-store, with staff and till reference for POS sales, and whether the points are pending or available.</p></div>
+    <div class="browser">
+      <div class="bbar"><span class="dots"><i></i><i></i><i></i></span><span class="url">…/apps/privilege-club/transactions</span></div>
+      <div class="app">
+        <div class="topbar"><span class="sbrand"><em>P</em> Privilege Club</span><span class="gsearch">Search members, cards, vouchers…</span><span class="who"><span>OSC Salisbury HQ</span><b>NM</b></span></div>
+        <nav class="nav" data-nav="5"></nav>
+        <div class="main">
+          <div class="phead"><div><h4>Transactions</h4><div class="sub">13 Aug 2026 &middot; all locations</div></div>
+            <div class="acts"><select class="inp"><option>All locations</option><option>Salisbury</option><option>Andover</option><option>Winchester</option><option>Online</option></select><button class="btn">Export CSV</button></div></div>
+          <div class="card">
+            <div class="filters">
+              <span class="inp search">Search order reference, member, card number…</span>
+              <select class="inp"><option>Type: all</option><option>Earn</option><option>Redemption</option><option>Reversal</option><option>Adjustment</option><option>Expiry</option></select>
+              <select class="inp"><option>Channel: all</option><option>Online</option><option>In-store</option></select>
+              <span class="inp">01 Aug – 13 Aug 2026</span>
+            </div>
+            <div class="tbl-wrap"><table>
+              <tr><th>Order</th><th>Date &amp; time</th><th>Member</th><th>Channel</th><th>Staff / till</th><th class="num">Order total</th><th class="num">Eligible spend</th><th class="num">Points</th><th>Status</th><th>Voucher used</th></tr>
+              <tr><td class="mono">#POS-8841</td><td class="mono">13 Aug 09:31</td><td>M. Whitfield</td><td><span class="tag t-info">Salisbury</span></td><td>Ellie R. &middot; Till 1</td><td class="num">£72.40</td><td class="num">£72.40</td><td class="num plus">+72</td><td><span class="tag t-warn">Pending</span></td><td>—</td></tr>
+              <tr><td class="mono">#10482</td><td class="mono">13 Aug 09:19</td><td>J. Dhillon</td><td><span class="tag t-mute">Online</span></td><td>—</td><td class="num">£64.00</td><td class="num">£64.00</td><td class="num plus">+64</td><td><span class="tag t-warn">Pending</span></td><td class="mono">£10 &middot; 2 × £5</td></tr>
+              <tr><td class="mono">#POS-8836</td><td class="mono">13 Aug 09:02</td><td>Not a member</td><td><span class="tag t-info">Andover</span></td><td>Ellie R. &middot; Till 2</td><td class="num">£19.00</td><td class="num">—</td><td class="num">—</td><td>—</td><td>—</td></tr>
+              <tr><td class="mono">#POS-8790</td><td class="mono">12 Aug 16:40</td><td>A. Kaur</td><td><span class="tag t-info">Winchester</span></td><td>Dan P. &middot; Till 1</td><td class="num">−£32.00</td><td class="num">−£32.00</td><td class="num minus">−32</td><td><span class="tag t-ok">Reversed</span></td><td>Refund</td></tr>
+              <tr><td class="mono">#10466</td><td class="mono">09 Aug 14:02</td><td>M. Whitfield</td><td><span class="tag t-mute">Online</span></td><td>—</td><td class="num">£118.00</td><td class="num">£118.00</td><td class="num plus">+118</td><td><span class="tag t-ok">Available</span></td><td class="mono">£10 &middot; 2 × £5</td></tr>
+            </table></div>
+            <div class="foot"><span>All qualifying items earn, including sale and promotional lines. Treatment of the voucher-funded portion is to be confirmed at specification.</span><span class="pager"><i>‹</i><b>1</b><i>2</i><i>›</i></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- A8 Reports ---------- -->
+  <div class="screen" id="a8">
+    <div class="scaption"><span class="mod">Module 7</span><h3>Reports — the five confirmed reports</h3><span class="exp">Expectation 9</span>
+      <p>Each report runs over a selectable date range with channel, store, staff and gender filters, and exports to PDF or CSV. All other reporting is out of scope at this stage.</p></div>
+    <div class="browser">
+      <div class="bbar"><span class="dots"><i></i><i></i><i></i></span><span class="url">…/apps/privilege-club/reports</span></div>
+      <div class="app">
+        <div class="topbar"><span class="sbrand"><em>P</em> Privilege Club</span><span class="gsearch">Search members, cards, vouchers…</span><span class="who"><span>OSC Salisbury HQ</span><b>NM</b></span></div>
+        <nav class="nav" data-nav="6"></nav>
+        <div class="main">
+          <div class="phead"><div><h4>Reports</h4><div class="sub">Date range applies to every report</div></div>
+            <div class="acts"><span class="inp">01 Jan – 13 Aug 2026</span><button class="btn">Export PDF</button><button class="btn">Export CSV</button></div></div>
+          <div class="card" style="margin-bottom:14px"><div class="filters">
+            <span class="hint" style="font-weight:600;color:var(--ink)">Filters applied to every report</span>
+            <select class="inp"><option>Channel: all</option><option>Online</option><option>In-store</option></select>
+            <select class="inp"><option>Store: all locations</option><option>Salisbury</option><option>Andover</option><option>Winchester</option></select>
+            <select class="inp"><option>Staff: all</option><option>Ellie R.</option><option>Dan P.</option></select>
+            <select class="inp"><option>Gender: all</option><option>Female</option><option>Male</option><option>Not held</option></select>
+            <select class="inp"><option>Compare: none</option><option>Month on month</option><option>Year on year</option></select>
+          </div><div class="cbody" style="padding-top:11px"><div class="note" style="margin:0">Gender is read from the customer metafield configured in the development and live stores. Year-on-year comparison becomes meaningful as data accumulates after go-live — legacy migration data holds total spend per member, not monthly order history.</div></div></div>
+          <div class="repcards" style="margin-bottom:16px">
+            <div class="rep"><span class="n">R1</span><b>Total loyalty members</b><p>Overall count with Active / Lapsed split.</p><div class="x"><button class="btn sm p">CSV</button><button class="btn sm">PDF</button></div></div>
+            <div class="rep"><span class="n">R2</span><b>New loyalty sign-ups</b><p>Enrolments by date range, split online vs in-store.</p><div class="x"><button class="btn sm">CSV</button><button class="btn sm">PDF</button></div></div>
+            <div class="rep"><span class="n">R3</span><b>Loyalty-driven orders &amp; revenue</b><p>Orders where a member earned or redeemed, as a % of total sales by both revenue and order count.</p><div class="x"><button class="btn sm">CSV</button><button class="btn sm">PDF</button></div></div>
+            <div class="rep"><span class="n">R4</span><b>Online vs in-store activity</b><p>Earning and redemption compared by channel.</p><div class="x"><button class="btn sm">CSV</button><button class="btn sm">PDF</button></div></div>
+            <div class="rep"><span class="n">R5</span><b>Birthday reward activity</b><p>Birthday vouchers issued, redeemed and expired.</p><div class="x"><button class="btn sm">CSV</button><button class="btn sm">PDF</button></div></div>
+          </div>
+          
+          
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- A9 Migration ---------- -->
+  <div class="screen" id="a9">
+    <div class="scaption"><span class="mod">Module 6</span><h3>Migration report &amp; exception review</h3><span class="exp">Expectation 6</span>
+      <p>Reconciliation counts after each import run, with the exception list OSC reviews before cutover. Matching is on email, with postcode as a supporting reference field.</p></div>
+    <div class="browser">
+      <div class="bbar"><span class="dots"><i></i><i></i><i></i></span><span class="url">…/apps/privilege-club/reports/migration</span></div>
+      <div class="app">
+        <div class="topbar"><span class="sbrand"><em>P</em> Privilege Club</span><span class="gsearch">Search members, cards, vouchers…</span><span class="who"><span>OSC Salisbury HQ</span><b>NM</b></span></div>
+        <nav class="nav" data-nav="6"></nav>
+        <div class="main">
+          <div class="phead"><div><h4>Migration — Dynamics / ORD</h4><div class="sub">Run 3 (dry run) &middot; 11 Aug 2026 22:14 &middot; source file OSC_LOYALTY_FULL.csv</div></div>
+            <div class="acts"><button class="btn">Download exceptions CSV</button><button class="btn">Reconciliation PDF</button></div></div>
+          <div class="kpis">
+            <div class="kpi"><div class="k">Records in source</div><div class="v">42,904</div><div class="d">Full export + 1 delta</div></div>
+            <div class="kpi"><div class="k">Imported</div><div class="v">41,286</div><div class="d">96.2%</div></div>
+            <div class="kpi"><div class="k">Merged as duplicates</div><div class="v">1,471</div><div class="d">Email match, postcode confirmed</div></div>
+            <div class="kpi acc"><div class="k">Exceptions</div><div class="v">147</div><div class="d">Awaiting OSC review</div></div>
+          </div>
+          <div class="card">
+            <div class="filters"><span class="inp search">Search postcode or legacy card…</span>
+              <select class="inp"><option>Reason: all</option><option>Email missing / invalid</option><option>Postcode missing (supporting)</option><option>Points value not numeric</option><option>Ambiguous match</option><option>Duplicate card number</option></select>
+              <span class="hint">147 exceptions</span></div>
+            <div class="tbl-wrap"><table>
+              <tr><th>Legacy card</th><th>Email (raw)</th><th>Name (raw)</th><th>Postcode (raw)</th><th>Points (raw)</th><th>Reason</th><th>Suggested action</th></tr>
+              <tr><td class="mono">D-104221</td><td class="mono">m.whitfeild@example.co.uk</td><td>WHITFIELD M</td><td class="mono">SP46AB</td><td class="mono">340</td><td><span class="tag t-warn">Email near-match</span></td><td>Confirm, merge into 0041-2287</td></tr>
+              <tr><td class="mono">D-077310</td><td><span class="tag t-bad">blank</span></td><td>J SMITH</td><td class="mono">SP2 9LL</td><td class="mono">85</td><td><span class="tag t-bad">No email held</span></td><td>OSC to confirm — cannot key record</td></tr>
+              <tr><td class="mono">D-119004</td><td class="mono">r.patel@example.com</td><td>R. PATEL</td><td class="mono">SO23 8TT</td><td class="mono">"1,2O0"</td><td><span class="tag t-bad">Points not numeric</span></td><td>Correct to 1200</td></tr>
+              <tr><td class="mono">D-088112</td><td class="mono">a.kaur@example.co.uk</td><td>A KAUR</td><td class="mono">(blank)</td><td class="mono">640</td><td><span class="tag t-warn">Duplicate email, 2 cards</span></td><td>Merge, keep newest card</td></tr>
+            </table></div>
+            <div class="foot"><span>No record is imported from the exception list until OSC signs off the resolution.</span><span class="pager"><i>‹</i><b>1</b><i>2</i><i>›</i></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- A10 Settings rules ---------- -->
+  <div class="screen" id="a10">
+    <div class="scaption"><span class="mod">Module 1 + 8</span><h3>Settings — rules engine</h3><span class="exp">Expectation 10</span>
+      <p>Every rule below is OSC-configurable without developer involvement, as confirmed in proposal v1.1. Try editing the fields — the preview recalculates.</p></div>
+    <div class="browser">
+      <div class="bbar"><span class="dots"><i></i><i></i><i></i></span><span class="url">…/apps/privilege-club/settings/rules</span></div>
+      <div class="app">
+        <div class="topbar"><span class="sbrand"><em>P</em> Privilege Club</span><span class="gsearch">Search members, cards, vouchers…</span><span class="who"><span>OSC Salisbury HQ</span><b>NM</b></span></div>
+        <nav class="nav" data-nav="7"></nav>
+        <div class="main">
+          <div class="phead"><div><h4>Settings</h4><div class="sub">Rules &middot; Klaviyo</div></div>
+            <div class="acts"><button class="btn">Discard</button><button class="btn p">Save rules</button></div></div>
+          <div class="tabs"><b>Rules</b><i>Klaviyo</i></div>
+          <div class="grid2" style="margin-top:16px">
+            <div class="card"><h5>Earning &amp; rewards</h5><div class="cbody">
+              <div class="setrow"><span class="lab"><b>Earn rate</b><span>Points earned per £1 of qualifying spend</span></span><input class="inp mono" id="r-earn" value="1"></div>
+              <div class="setrow"><span class="lab"><b>Voucher threshold</b><span>Points required for one voucher increment</span></span><input class="inp mono" id="r-thr" value="100"></div>
+              <div class="setrow"><span class="lab"><b>Voucher value</b><span>Value of one increment, in £</span></span><input class="inp mono" id="r-val" value="5"></div>
+              <div class="setrow"><span class="lab"><b>Birthday reward</b><span>Issued automatically once per year, in £</span></span><input class="inp mono" id="r-bday" value="10"></div>
+              <div class="setrow"><span class="lab"><b>Pending period</b><span>Days before earned points become available</span></span><input class="inp mono" value="30"></div>
+              <div class="setrow"><span class="lab"><b>Points expiry</b><span>Months from earning</span></span><input class="inp mono" value="6"></div>
+              <div class="setrow"><span class="lab"><b>Voucher expiry</b><span>Months from issue</span></span><input class="inp mono" value="6"></div>
+              <div class="setrow"><span class="lab"><b>Earn on all qualifying items</b><span>Includes sale, discounted and promotional lines</span></span><span><span class="switch"></span></span></div>
+              <div class="setrow"><span class="lab"><b>Reverse points on refund</b><span>Full and partial refunds</span></span><span><span class="switch"></span></span></div>
+            </div></div>
+            <div class="card" style="margin-top:12px"><h5>Redemption rules</h5><div class="cbody">
+              <div class="setrow"><span class="lab"><b>Minimum basket spend</b><span>Before any voucher can be applied, in £</span></span><input class="inp mono" value="20"></div>
+              <div class="setrow"><span class="lab"><b>Maximum per order</b><span>Voucher value cap, in £</span></span><input class="inp mono" id="r-cap" value="50"></div>
+              <div class="setrow"><span class="lab"><b>Redemption increment</b><span>Rounded down to this value, in £</span></span><input class="inp mono" value="5"></div>
+              <div class="setrow"><span class="lab"><b>Voucher spend must stay below basket total</b><span>Prevents a fully voucher-funded order</span></span><span><span class="switch"></span></span></div>
+              <div class="setrow"><span class="lab"><b>Excluded products reduce eligible portion</b><span>Cap calculated on the eligible basket only</span></span><span><span class="switch"></span></span></div>
+              <div class="setrow"><span class="lab"><b>Online redemption</b><span>Allow at Shopify checkout</span></span><span><span class="switch"></span></span></div>
+              <div class="setrow"><span class="lab"><b>POS redemption</b><span>Allow at the till</span></span><span><span class="switch"></span></span></div>
+              <div class="setrow"><span class="lab"><b>Eligible / excluded items</b><span>Managed by collection or product tag</span></span><button class="btn">Configure</button></div>
+            </div></div>
+            <div>
+              <div class="preview" style="margin-bottom:12px">
+                <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#9FB4AB">Live preview — Margaret Whitfield</div>
+                <div class="big">340 points → <em id="pv-val">£15</em></div>
+                <div id="pv-note" style="color:#A9BEB6">300 points used &middot; 40 carried forward &middot; 60 points to the next £5</div>
+                <div id="pv-cap" style="color:#8CA39A;font-size:11.5px;margin-top:7px">Redeemable in £5 steps, up to £50 per order, and only below the basket total.</div>
+                <div style="color:#8CA39A;font-size:11.5px;margin-top:5px">Her 72 pending points are excluded until they clear on 12 Sep.</div>
+                <div class="note" style="color:#8CA39A;margin-top:11px">Customers only ever see the £ figure. The points balance stays in the backend.</div>
+              </div>
+              <div class="card"><h5>Before you save</h5><div class="cbody">
+                <div class="callout"><b>Rule changes apply from the moment they are saved</b> and are written to the audit log with your name, the old value and the new value. Existing vouchers already issued are not retrospectively changed.</div>
+                <div class="note">Only the Loyalty Manager and Administrator roles can edit this screen.</div>
+              </div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- A11 Roles ---------- -->
+ 
+
+  <!-- ---------- A12 Audit ---------- -->
+  <div class="screen" id="a12">
+    <div class="scaption"><span class="mod">Module 8</span><h3>Audit log</h3><span class="exp">Expectation 7, 9</span>
+      <p>Searchable record of who did what and when — adjustments, voucher actions, rule changes and POS redemptions.</p></div>
+    <div class="browser">
+      <div class="bbar"><span class="dots"><i></i><i></i><i></i></span><span class="url">…/apps/privilege-club/audit</span></div>
+      <div class="app">
+        <div class="topbar"><span class="sbrand"><em>P</em> Privilege Club</span><span class="gsearch">Search members, cards, vouchers…</span><span class="who"><span>OSC Salisbury HQ</span><b>NM</b></span></div>
+        <nav class="nav" data-nav="8"></nav>
+        <div class="main">
+          <div class="phead"><div><h4>Audit log</h4><div class="sub">Immutable &middot; retained for the life of the programme</div></div><div class="acts"><button class="btn">Export CSV</button></div></div>
+          <div class="card">
+            <div class="filters"><span class="inp search">Search user, member, reference…</span>
+              <select class="inp"><option>Action: all</option><option>Points adjustment</option><option>Voucher issued</option><option>Voucher cancelled</option><option>Rule change</option><option>POS redemption</option><option>Enrolment</option><option>Migration</option></select>
+              <select class="inp"><option>User: all</option><option>N. Mehra</option><option>Ellie R.</option><option>System</option></select>
+              <span class="inp">01 Aug – 13 Aug 2026</span></div>
+            <div class="tbl-wrap"><table>
+              <tr><th>Timestamp</th><th>User</th><th>Role</th><th>Action</th><th>Target</th><th>Before → after</th><th>Reason</th></tr>
+              <tr><td class="mono">13 Aug 09:44</td><td>N. Mehra</td><td>Loyalty manager</td><td>Points adjustment</td><td>0041-2287</td><td class="mono">340 → 390</td><td>Goodwill — damaged acer (#4471)</td></tr>
+              <tr><td class="mono">13 Aug 09:31</td><td>Ellie R.</td><td>Store staff</td><td>POS earn</td><td>0041-2287</td><td class="mono">292 → 340</td><td>#POS-8841</td></tr>
+              <tr><td class="mono">12 Aug 17:12</td><td>N. Mehra</td><td>Loyalty manager</td><td>Voucher cancelled</td><td>GW-9021-5567</td><td class="mono">Active → Cancelled</td><td>Issued to wrong member</td></tr>
+              <tr><td class="mono">11 Aug 10:05</td><td>A. Shah</td><td>Administrator</td><td>Rule change</td><td>Points expiry</td><td class="mono">12 → 6 months</td><td>Board decision Aug 2026</td></tr>
+              <tr><td class="mono">11 Aug 22:14</td><td>System</td><td>—</td><td>Migration dry run</td><td>Run 3</td><td class="mono">41,286 imported</td><td>147 exceptions raised</td></tr>
+              <tr><td class="mono">09 Aug 14:02</td><td>System</td><td>—</td><td>Voucher redeemed</td><td>PC-4B71-2280</td><td class="mono">Active → Redeemed</td><td>Order #10466</td></tr>
+            </table></div>
+            <div class="foot"><span>Entries cannot be edited or deleted from the interface.</span><span class="pager"><i>‹</i><b>1</b><i>2</i><i>3</i><i>›</i></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ SURFACE B — POS ══════════════════════════ -->
+<section class="surface" id="s-pos">
+  <div class="surfintro">
+    <h2>B. Shopify POS Pro — Privilege Club tile</h2>
+    <p>Staff stay in the native Shopify POS experience. A smart-grid tile opens the loyalty modal; every action is a few taps and is logged against the staff member and till.</p>
+  </div>
+  <div class="chips" role="tablist" data-for="pos">
+    <button class="chip" role="tab" aria-selected="true" data-scr="b1"><u>B1</u> Till screen &amp; tile</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="b2"><u>B2</u> Member lookup</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="b3"><u>B3</u> Search results</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="b4"><u>B4</u> Member view at till</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="b5"><u>B5</u> Attached to sale</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="b6"><u>B6</u> Voucher applied</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="b7"><u>B7</u> Voucher rejected</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="b8"><u>B8</u> Enrol at till</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="b9"><u>B9</u> Duplicate check</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="b10"><u>B10</u> Customer journey</button>
+  </div>
+
+  <!-- B1 -->
+  <div class="screen on" id="b1">
+    <div class="scaption"><span class="mod">Module 3</span><h3>Till screen — Privilege Club tile on the smart grid</h3><span class="exp">Expectation 4</span>
+      <p>One tile, always in the same place, for every loyalty action. Staff never leave POS.</p></div>
+    <div class="tablet">
+      <div class="tlabel"><span>Shopify POS Pro &middot; iPad &middot; OSC Salisbury &middot; Till 1</span><span>Ellie R.</span></div>
+      <div class="glass"><div class="pos">
+        <div class="pos-main">
+          <div class="pos-top"><span class="st"><b>Salisbury</b>Till 1 &middot; Ellie R.</span><span class="pos-search">Search products, </span></div>
+          <div class="smartgrid" data-grid="1"></div>
+        </div>
+        <div class="cart" data-cart="plain"></div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- B2 -->
+  <div class="screen" id="b2">
+    <div class="scaption"><span class="mod">Module 3 + 2</span><h3>Member lookup — name, postcode or card number</h3><span class="exp">Expectation 4, 6</span>
+      <p>Email is the primary identifier; name, postcode and legacy Dynamics card number are all searchable, so the physical card stays optional.</p></div>
+    <div class="tablet">
+      <div class="tlabel"><span>Privilege Club &middot; lookup</span><span>Ellie R.</span></div>
+      <div class="glass" style="position:relative"><div class="pos">
+        <div class="pos-main"><div class="pos-top"><span class="st"><b>Salisbury</b>Till 1</span><span class="pos-search">Search products, </span></div><div class="smartgrid" data-grid="1"></div></div>
+        <div class="cart" data-cart="plain"></div>
+        <div class="posmodal"><div class="pm">
+          <h6>Privilege Club <em>✕</em></h6>
+          <div class="pb">
+            <div class="seg"><span class="on">Email</span><span>Name</span><span>Postcode</span><span>Card no.</span></div>
+            <input class="bigfield" value="m.whitfield@example.co.uk" readonly>
+            <div class="hint" style="margin-top:8px">Email is the primary identifier. Name, postcode and card numbers — new (0041-2287) or legacy Dynamics (D-118422) — also work at the till.</div>
+            <div class="keypad"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>⌫</span><span>0</span><span>⏎</span></div>
+          </div>
+          <div class="pf"><button class="btn">Enrol new member</button><button class="btn p">Search</button></div>
+        </div></div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- B3 -->
+  <div class="screen" id="b3">
+    <div class="scaption"><span class="mod">Module 3</span><h3>Search results</h3><span class="exp">Expectation 3, 4</span>
+      <p>Two members share the postcode — staff confirm by name or email before attaching.</p></div>
+    <div class="tablet">
+      <div class="tlabel"><span>Privilege Club &middot; 2 matches for SP4 6AB</span><span>Ellie R.</span></div>
+      <div class="glass" style="position:relative"><div class="pos">
+        <div class="pos-main"><div class="pos-top"><span class="st"><b>Salisbury</b>Till 1</span><span class="pos-search">Search products, </span></div><div class="smartgrid" data-grid="1"></div></div>
+        <div class="cart" data-cart="plain"></div>
+        <div class="posmodal"><div class="pm">
+          <h6>2 members found — SP4 6AB (supporting search) <em>✕</em></h6>
+          <div class="pb">
+            <div class="res pick"><span class="av">MW</span><span class="txt"><b>Margaret Whitfield</b><span class="mono">0041-2287 &middot; legacy D-118422</span></span><span class="rt"><b class="mono" style="color:#7A5A18">£15</b><span>340 pts</span></span></div>
+            <div class="res"><span class="av">TW</span><span class="txt"><b>Thomas Whitfield</b><span class="mono">0041-2288</span></span><span class="rt"><b class="mono">£0</b><span>85 pts</span></span></div>
+            <div class="hint">Not the right person? Search by name or card number instead.</div>
+          </div>
+          <div class="pf"><button class="btn">Back to search</button><button class="btn p">Open member</button></div>
+        </div></div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- B4 -->
+  <div class="screen" id="b4">
+    <div class="scaption"><span class="mod">Module 3 + 4</span><h3>Member view at the till</h3><span class="exp">Expectation 4, 5</span>
+      <p>Staff select a redemption value in £5 increments rather than picking individual vouchers. Pending points are visible but not redeemable.</p></div>
+    <div class="tablet">
+      <div class="tlabel"><span>Privilege Club &middot; member</span><span>Ellie R.</span></div>
+      <div class="glass" style="position:relative"><div class="pos">
+        <div class="pos-main"><div class="pos-top"><span class="st"><b>Salisbury</b>Till 1</span><span class="pos-search">Search products, </span></div><div class="smartgrid" data-grid="1"></div></div>
+        <div class="cart" data-cart="plain"></div>
+        <div class="posmodal"><div class="pm" style="max-width:540px">
+          <h6>Margaret Whitfield <em>✕</em></h6>
+          <div class="pb">
+            <div style="display:flex;gap:11px;flex-wrap:wrap;margin-bottom:4px">
+              <div class="bal gold" style="flex:1;min-width:130px"><div class="k">Available to spend</div><div class="v">£15</div></div>
+              <div class="bal" style="flex:1;min-width:130px"><div class="k">To next £5</div><div class="v">60 pts</div><div class="n"><span class="progress"><i style="width:40%"></i></span></div></div>
+            </div>
+            <div class="hint" style="margin:9px 0 0">Member since Mar 2019 &middot; SP4 6AB &middot; card 0041-2287 &middot; <span class="tag t-ok">Active</span></div>
+            <div class="vlist">
+              <div class="vrow" style="background:#FFFCF5"><span class="amt">£10</span><span class="txt"><b>Redeem on this sale</b><span>£5 steps &middot; max £50 per order &middot; must stay below basket total</span></span><span style="display:flex;gap:6px;align-items:center"><button class="btn sm">−£5</button><button class="btn sm">+£5</button></span></div>
+              <div class="vrow"><span class="amt">£15</span><span class="txt"><b>Available to redeem</b><span>£5 will remain after this sale</span></span><span class="tag t-ok">Eligible</span></div>
+              <div class="vrow dis"><span class="amt">£10</span><span class="txt"><b>Birthday reward</b><span class="mono">Unlocks 12 Sep 2026</span></span><span class="tag t-mute">Not yet</span></div>
+              <div class="vrow dis"><span class="amt">72</span><span class="txt"><b>Pending points</b><span>Clear 12 Sep 2026 — not redeemable yet</span></span><span class="tag t-warn">Pending</span></div>
+            </div>
+            <div class="hint" style="margin-top:10px">Basket £72.40 &middot; eligible portion £72.40 &middot; redemption capped at £50</div>
+          </div>
+          <div class="pf"><button class="btn">Edit details</button><button class="btn p">Attach to sale</button></div>
+        </div></div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- B5 -->
+  <div class="screen" id="b5">
+    <div class="scaption"><span class="mod">Module 1 + 3</span><h3>Member attached to the sale</h3><span class="exp">Expectation 1, 4</span>
+      <p>All qualifying lines earn, including sale items. Staff can tell the customer what they will earn, and that it clears in 30 days.</p></div>
+    <div class="tablet">
+      <div class="tlabel"><span>Basket &middot; member attached</span><span>Ellie R.</span></div>
+      <div class="glass"><div class="pos">
+        <div class="pos-main"><div class="pos-top"><span class="st"><b>Salisbury</b>Till 1</span><span class="pos-search">Search products, </span></div><div class="smartgrid" data-grid="2"></div></div>
+        <div class="cart" data-cart="attached"></div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- B6 -->
+  <div class="screen" id="b6">
+    <div class="scaption"><span class="mod">Module 4</span><h3>Voucher validated and applied</h3><span class="exp">Expectation 5</span>
+      <p>Staff choose the value in £5 steps; it becomes a Shopify discount on the sale, validated against the configured caps.</p></div>
+    <div class="tablet">
+      <div class="tlabel"><span>Basket &middot; £10 voucher applied</span><span>Ellie R.</span></div>
+      <div class="glass"><div class="pos">
+        <div class="pos-main">
+          <div class="pos-top"><span class="st"><b>Salisbury</b>Till 1</span><span class="pos-search">Search products, </span></div>
+          <div class="banner ok" style="margin-bottom:11px"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span><b>£10 applied — 2 × £5 increments</b>Within the £50 per-order cap, above the minimum basket spend, and below the basket total. £5 remains on the account.</span></div>
+          <div class="smartgrid" data-grid="2"></div>
+        </div>
+        <div class="cart" data-cart="voucher"></div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- B7 -->
+  <div class="screen" id="b7">
+    <div class="scaption"><span class="mod">Module 4</span><h3>Voucher rejected — reason shown on screen</h3><span class="exp">Expectation 5</span>
+      <p>Real-time validation against minimum spend, the per-order cap, eligible basket portion, expiry and pending status. Staff see why, and what value would work.</p></div>
+    <div class="tablet">
+      <div class="tlabel"><span>Voucher validation failed</span><span>Ellie R.</span></div>
+      <div class="glass" style="position:relative"><div class="pos">
+        <div class="pos-main"><div class="pos-top"><span class="st"><b>Salisbury</b>Till 1</span><span class="pos-search">Search products.. </span></div><div class="smartgrid" data-grid="2"></div></div>
+        <div class="cart" data-cart="attached"></div>
+        <div class="posmodal"><div class="pm">
+          <h6>Voucher cannot be applied <em>✕</em></h6>
+          <div class="pb">
+            <div class="banner bad"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6m0-6 6 6"/></svg><span><b>Basket too low for £50</b>Voucher spend must stay below the basket total. Maximum for this basket is £70 → £50 cap applies, but the eligible portion is only £45. Offer £45.</span></div>
+            <div class="hint">Other reasons this message appears:</div>
+            <ul class="list-clean" style="margin-top:7px">
+              <li><b>Below minimum basket spend</b> — basket under the configured threshold</li>
+              <li><b>Over the per-order cap</b> — currently £50</li>
+              <li><b>Excluded products</b> — eligible portion is lower than the basket total</li>
+              <li><b>Points still pending</b> — earned within the last 30 days</li>
+              <li><b>Expired</b> or <b>already redeemed</b></li>
+              <li><b>Cancelled</b> — withdrawn by OSC head office</li>
+            </ul>
+          </div>
+          <div class="pf"><button class="btn">Choose another voucher</button><button class="btn p">Back to sale</button></div>
+        </div></div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- B8 -->
+  <div class="screen" id="b8">
+    <div class="scaption"><span class="mod">Module 2 + 3</span><h3>Enrol a new member at the till</h3><span class="exp">Expectation 2, 4</span>
+      <p>Minimum data set, captured in seconds. The customer earns on the transaction they are standing at.</p></div>
+    <div class="tablet">
+      <div class="tlabel"><span>Privilege Club &middot; enrol</span><span>Ellie R.</span></div>
+      <div class="glass" style="position:relative"><div class="pos">
+        <div class="pos-main"><div class="pos-top"><span class="st"><b>Salisbury</b>Till 1</span><span class="pos-search">Search products, </span></div><div class="smartgrid" data-grid="2"></div></div>
+        <div class="cart" data-cart="attached"></div>
+        <div class="posmodal"><div class="pm">
+          <h6>Join the Privilege Club <em>✕</em></h6>
+          <div class="pb">
+            <div class="stepbar"><span class="on"></span><span class="on"></span><span></span></div>
+            <div class="field"><label>First name <em>*</em></label><span class="inp" style="display:block">Rachel</span></div>
+            <div class="field"><label>Surname <em>*</em></label><span class="inp" style="display:block">Peterson</span></div>
+            <div class="field"><label>Email <em>*</em></label><span class="inp" style="display:block">r.peterson@example.co.uk</span><div class="h">Primary identifier — keeps one record per customer across web and till.</div></div>
+            <div class="field"><label>Postcode</label><span class="inp mono" style="display:block;color:var(--muted)">SP2 7QT</span><div class="h">Supporting field for lookup and duplicate validation.</div></div>
+            <div class="field"><label>Date of birth</label><span class="inp mono" style="display:block;color:var(--muted)">04 / 11 / 1979</span><div class="h">For the £10 birthday reward.</div></div>
+            <div class="field"><label>Marketing consent</label><span style="font-size:12.5px"><span class="chk on"></span> Yes, send offers and reward updates by email</span></div>
+          </div>
+          <div class="pf"><button class="btn">Cancel</button><button class="btn p">Create member &amp; attach to sale</button></div>
+        </div></div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- B9 -->
+  <div class="screen" id="b9">
+    <div class="scaption"><span class="mod">Module 2</span><h3>Duplicate check before creating a record</h3><span class="exp">Expectation 3</span>
+      <p>Email is checked first, with postcode and name as supporting confirmation, so the same customer never ends up with two records.</p></div>
+    <div class="tablet">
+      <div class="tlabel"><span>Possible existing member</span><span>Ellie R.</span></div>
+      <div class="glass" style="position:relative"><div class="pos">
+        <div class="pos-main"><div class="pos-top"><span class="st"><b>Salisbury</b>Till 1</span><span class="pos-search">Search products, </span></div><div class="smartgrid" data-grid="2"></div></div>
+        <div class="cart" data-cart="attached"></div>
+        <div class="posmodal"><div class="pm">
+          <h6>This customer may already be a member <em>✕</em></h6>
+          <div class="pb">
+            <div class="banner warn"><svg viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg><span><b>Email already registered</b>Check with the customer before creating a new record. Postcode and surname also match.</span></div>
+            <div class="res pick"><span class="av">RP</span><span class="txt"><b>R. Peterson</b><span class="mono">r.peterson@example.co.uk &middot; SP2 7QT &middot; legacy D-093118</span></span><span class="rt"><b class="mono" style="color:#7A5A18">£20</b><span>410 pts</span></span></div>
+            <div class="hint">Using the existing record keeps their 410 points and £20 of vouchers.</div>
+          </div>
+          <div class="pf"><button class="btn">Create new anyway</button><button class="btn p">Use existing member</button></div>
+        </div></div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- B10 journey -->
+  <div class="screen" id="b10">
+    <div class="scaption"><span class="mod">Module 1–5</span><h3>POS customer journey</h3><span class="exp">Expectation 1, 4, 5, 8</span>
+      <p>What happens at the till, in order, and what the system does in the background at each step.</p></div>
+    <div class="flow">
+      <div class="step"><div class="n">01</div><b>Customer arrives at till</b><p>Staff tap the Privilege Club tile and search by email, name, postcode or card number — old card or new.</p><div class="who">Staff &middot; 5 seconds</div></div>
+      <div class="step"><div class="n">02</div><b>Member found, or enrolled</b><p>Existing member opens with available and pending balances. New customer is enrolled from the same tile after an email duplicate check.</p><div class="who">Staff &middot; 20 seconds</div></div>
+      <div class="step"><div class="n">03</div><b>Attach to the sale</b><p>One tap links the member to the basket. All qualifying lines earn, sale items included.</p><div class="who">Staff &middot; 1 tap</div></div>
+      <div class="step"><div class="n">04</div><b>Redeem, if they want to</b><p>Staff choose a value in £5 steps up to the £50 cap; it is validated against minimum spend and eligible basket, or refused with the reason shown.</p><div class="who">Staff &middot; 2 taps</div></div>
+      <div class="step"><div class="n">05</div><b>Payment completes</b><p>Points are earned on all qualifying lines and enter a 30-day pending period. The redemption is closed and the voucher balance updates on both channels.</p><div class="who">System &middot; real time</div></div>
+      <div class="step"><div class="n">06</div><b>Confirmation &amp; follow-up</b><p>Ledger entry written with staff, till and order reference. Klaviyo messages wait until the points clear — nothing is promised that a refund could take back.</p><div class="who">System &middot; automatic</div></div>
+    </div>
+    <div class="swimlane">
+      <div class="lane"><div class="lh">Customer<span>What they experience</span></div><div class="lb"><span class="node">Gives name or postcode</span><span class="node">No card needed</span><span class="node g">Told balance in £</span><span class="node">Chooses value in £5 steps</span><span class="node">Pays reduced total</span><span class="node g">Email once points clear</span></div></div>
+      <div class="lane"><div class="lh">Store staff<span>Inside Shopify POS</span></div><div class="lb"><span class="node k">Tap tile</span><span class="node k">Search by email</span><span class="node k">Attach to sale</span><span class="node k">Set £ value</span><span class="node k">Take payment</span></div></div>
+      <div class="lane"><div class="lh">System<span>Loyalty engine</span></div><div class="lb"><span class="node">Email lookup</span><span class="node">Duplicate check</span><span class="node">Qualify lines</span><span class="node">Check cap &amp; min spend</span><span class="node">Write ledger entry</span><span class="node">Hold 30 days pending</span><span class="node">Push Klaviyo event on clear</span></div></div>
+    </div>
+    <div class="legendbar"><span><b>No paper.</b> No card required, no forms, no postal fulfilment.</span><span><b>30-day pending.</b> Refund protection before points become spendable.</span><span><b>Full audit trail.</b> Staff, till, location, time and order reference on every action.</span><span><b>One balance.</b> Identical online and in-store, in real time.</span></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ SURFACE C — MEMBER ══════════════════════════ -->
+<section class="surface" id="s-member">
+  <div class="surfintro">
+    <h2>C. Member portal — online and in store</h2>
+    <p>Members see one thing: the money they have to spend. The points balance stays a backend value, exactly as confirmed in the scope.</p>
+  </div>
+  <div class="chips" role="tablist" data-for="member">
+    <button class="chip" role="tab" aria-selected="true" data-scr="c1"><u>C1</u> Join online</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="c2"><u>C2</u> My Privilege Club</button>
+    <button class="chip" role="tab" aria-selected="false" data-scr="c3"><u>C3</u> Redeem at checkout</button>
+    
+  </div>
+
+  <!-- C1 -->
+  <div class="screen on" id="c1">
+    <div class="scaption"><span class="mod">Module 2</span><h3>Join online — complete your loyalty profile</h3><span class="exp">Expectation 2, 3</span>
+      <p>Standard Shopify registration — the email becomes the primary identifier. Postcode and date of birth follow. Membership is active immediately; the profile can be finished later.</p></div>
+    <div class="browser">
+      <div class="bbar"><span class="dots"><i></i><i></i><i></i></span><span class="url">osc.co.uk/account/privilege-club/join</span></div>
+      <div>
+        <div class="sitebar"><b>OSC</b><span>Plants</span><span>Garden</span><span>Gifts</span><span>Café</span><span style="color:#E2C889">Privilege Club</span><span>Account</span><span>Basket (3)</span></div>
+        <div class="mbody">
+          <div style="max-width:620px;margin:0 auto">
+            <div class="stepbar"><span class="on"></span><span class="on"></span><span></span></div>
+            <h4 style="font-family:var(--serif);font-size:23px;margin-bottom:5px">Two more details and you're in</h4>
+            <p style="color:var(--muted);font-size:13px;margin:0 0 20px">Your account is created against <b>m.whitfield@example.co.uk</b>. Add your postcode so staff can find you in store, and your birthday for your £10 reward.</p>
+            <div class="grid2" style="grid-template-columns:1fr 1fr">
+              <div class="field"><label>Postcode <em>*</em></label><span class="inp mono" style="display:block">SP4 6AB</span><div class="h">Helps staff find you at the till.</div></div>
+              <div class="field"><label>Date of birth</label><span class="inp mono" style="display:block;color:var(--muted)">12 / 09 / 1958</span><div class="h">Used only for your birthday reward.</div></div>
+            </div>
+            <div class="field"><label>Old membership card number, if you have one</label><span class="inp mono" style="display:block;color:var(--muted)">D-118422</span><div class="h">We'll bring your existing points across — you don't need to start again.</div></div>
+            <div class="field" style="margin-top:6px"><span style="font-size:12.5px"><span class="chk on"></span> Email me when I have a new reward to spend</span></div>
+            <button class="btn p" style="padding:11px 20px;margin-top:6px">Finish and see my rewards</button>
+            <div class="callout" style="margin-top:18px"><b>How it works.</b> Spend £1 and earn 1 point, online or in store — sale items included. Every 100 points becomes £5 to spend, and we'll email you once it's ready to use (about 30 days after you shop).</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C2 -->
+  <div class="screen" id="c2">
+    <div class="scaption"><span class="mod">Module 2 + 4</span><h3>My Privilege Club — inside the Shopify account</h3><span class="exp">Expectation 2, 5</span>
+      <p>Voucher value only. No points figure — available or pending — anywhere on the customer-facing side.</p></div>
+    <div class="mrow">
+      <div class="msite"><div class="browser">
+        <div class="bbar"><span class="dots"><i></i><i></i><i></i></span><span class="url">osc.co.uk/account/privilege-club</span></div>
+        <div>
+          <div class="sitebar"><b>OSC</b><span>Plants</span><span>Garden</span><span>Gifts</span><span>Café</span><span style="color:#E2C889">Privilege Club</span><span>Margaret</span><span>Basket (3)</span></div>
+          <div class="mbody">
+            <div class="acctnav"><i>Orders</i><b>Privilege Club</b><i>Details</i><i>Addresses</i><i>Sign out</i></div>
+            <div class="voucherhero">
+              <div class="lab">Ready to spend</div>
+              <div class="amt">£15.00</div>
+              <div class="sub">Use it online at checkout or at any OSC store — just give the email on your account. Redeemed in £5 steps, up to £50 per order.</div>
+              <button class="cta">Shop with my £15</button>
+            </div>
+            <div class="vgrid">
+              <div class="vcard"><div class="amt">£10</div><div class="t">Reward voucher</div><div class="e">Use by 2 Jan 2027</div></div>
+              <div class="vcard"><div class="amt">£5</div><div class="t">Reward voucher</div><div class="e">Use by 28 Jan 2027</div></div>
+              <div class="vcard bday"><span class="rib">Birthday</span><div class="amt">£10</div><div class="t">Birthday reward</div><div class="e">Unlocks 12 Sep 2026</div></div>
+            </div>
+            <div class="card" style="margin-top:16px"><h5>Your rewards so far</h5><div class="tbl-wrap"><table>
+              <tr><th>Date</th><th>What happened</th><th>Where</th><th class="num">Reward</th></tr>
+              <tr><td>13 Aug 2026</td><td>New £5 reward unlocked</td><td>Salisbury</td><td class="num">+£5</td></tr>
+              <tr><td>09 Aug 2026</td><td>£10 voucher used</td><td>Online</td><td class="num">−£10</td></tr>
+              <tr><td>12 Sep 2025</td><td>Birthday reward added</td><td>—</td><td class="num">+£10</td></tr>
+            </table></div><div class="foot"><span>Rewards are shown in pounds. Recent shopping takes about 30 days to turn into a reward. Nothing expires without an email first.</span></div></div>
+          </div>
+        </div>
+      </div></div>
+      <div class="phone">
+        <div class="notch"><i></i></div>
+        <div class="glass">
+          <div class="sitebar" style="padding:9px 12px;font-size:11px"><b style="font-size:13px">OSC</b><span>☰</span></div>
+          <div style="padding:14px">
+            <div class="voucherhero" style="padding:17px"><div class="lab">Ready to spend</div><div class="amt" style="font-size:38px">£15.00</div><div class="sub" style="font-size:11.5px">Online or in any store</div><button class="cta" style="font-size:12px;padding:9px 14px">Shop now</button></div>
+            <div class="vcard" style="margin-top:11px"><div class="amt" style="font-size:22px">£10</div><div class="t">Reward voucher</div><div class="e">Use by 2 Jan 2027</div></div>
+            <div class="vcard" style="margin-top:9px"><div class="amt" style="font-size:22px">£5</div><div class="t">Reward voucher</div><div class="e">Use by 28 Jan 2027</div></div>
+            <button class="btn" style="width:100%;margin-top:11px;padding:10px">Show my card in store</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="legendbar"><span><b>Shown to the member:</b> available £ value, individual vouchers, expiry dates, birthday reward.</span><span><b>Held in the backend only:</b> points balance, pending points, points to next £5, ledger entries.</span></div>
+  </div>
+
+  <!-- C3 -->
+  <div class="screen" id="c3">
+    <div class="scaption"><span class="mod">Module 4</span><h3>Redeem at online checkout</h3><span class="exp">Expectation 2, 5</span>
+      <p>The reward is applied in £5 steps at Shopify checkout, validated against the minimum spend, the £50 cap and the eligible basket portion before the order is placed.</p></div>
+    <div class="mrow">
+      <div class="msite"><div class="browser">
+        <div class="bbar"><span class="dots"><i></i><i></i><i></i></span><span class="url">osc.co.uk/checkout</span></div>
+        <div>
+          <div class="sitebar"><b>OSC</b><span style="margin-left:auto">Secure checkout</span></div>
+          <div class="mbody"><div class="grid2">
+            <div>
+              <h4 style="font-size:16px;margin-bottom:12px">Payment</h4>
+              <div class="card" style="margin-bottom:12px"><div class="cbody">
+                <div class="field"><label>Card number</label><span class="inp mono" style="display:block;color:var(--muted)">•••• •••• •••• 4417</span></div>
+                <div class="grid2" style="grid-template-columns:1fr 1fr;gap:11px"><div class="field"><label>Expiry</label><span class="inp mono" style="display:block;color:var(--muted)">09 / 29</span></div><div class="field"><label>Security code</label><span class="inp mono" style="display:block;color:var(--muted)">•••</span></div></div>
+              </div></div>
+              <div class="card"><h5>Privilege Club</h5><div class="cbody">
+                <div class="banner ok" style="margin-bottom:11px"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span><b>£10 reward applied</b>Chosen in £5 steps. £5 stays on your account for next time.</span></div>
+                <div class="vrow" style="border:1px solid var(--line);border-radius:9px"><span class="amt">£5</span><span class="txt"><b>Use my remaining £5 too</b><span>Up to £50 per order, and must stay below your basket total</span></span><button class="btn sm">Apply</button></div>
+              </div></div>
+            </div>
+            <div class="card"><h5>Order summary</h5><div class="cbody tight">
+              <div class="ci"><span>Japanese acer 'Bloodgood'<span>1 × £42.00 &middot; earns points</span></span><span class="mono">£42.00</span></div>
+              <div class="ci"><span>Terracotta pot, 30cm<span>1 × £18.00 &middot; earns points</span></span><span class="mono">£18.00</span></div>
+              <div class="ci"><span>Bulb collection<span>1 × £12.00 &middot; <b style="color:var(--warn)">sale item — still earns</b></span></span><span class="mono">£12.00</span></div>
+              <div class="ci disc"><span><b>Privilege Club reward</b><span>2 × £5 increments</span></span><b class="mono">−£10.00</b></div>
+              <div class="cbody" style="border-top:1px solid var(--line)">
+                <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px"><span>Subtotal</span><span class="mono">£62.00</span></div>
+                <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:9px"><span>Delivery</span><span class="mono">£4.95</span></div>
+                <div style="display:flex;justify-content:space-between;font-size:17px;font-weight:600"><span>Total</span><span class="mono">£66.95</span></div>
+                <div class="callout" style="margin-top:13px">You'll earn 72 points on this order — sale items included. They become a reward you can spend about 30 days after delivery.</div>
+              </div>
+            </div></div>
+          </div></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+
+
+
+</section>
+
+<div class="foot-note">
+  <b>How to read this document.</b> These are illustrative structure screens, produced to agree layout, navigation and field-level content before design begins. Visual styling, OSC brand treatment and final wording will be applied at the design stage. Every screen carries the proposal module number it delivers, so this pack can be reviewed alongside the Scope of Work.
+  <br><br><b>What changed in v1.1</b>, following Proposal v1.1 (14 Aug):
+  <br>1. <b>Email is now the primary customer identifier</b>; postcode is a supporting field for lookup and duplicate validation. Search order, enrolment forms, duplicate checks and migration matching all reflect this.
+  <br>2. <b>Points are earned on all qualifying items</b>, including sale, discounted and promotional lines. The previous full-price-only qualification logic has been removed throughout.
+  <br>3. <b>New: 30-day pending period.</b> Earned points are held pending before becoming available or triggering any customer communication. Visible in admin balances, the ledger, the POS member view and the Klaviyo triggers.
+  <br>4. <b>Redemption is now value-based, not voucher-based at POS.</b> Staff choose an amount in £5 increments, capped at £50 per order, above the minimum basket spend and below the basket total, with excluded products reducing the eligible portion.
+  <br>5. <b>Rules engine extended</b> with minimum basket spend, per-order cap, increment, eligible/excluded items, and separate online and POS redemption switches.
+  <br>6. <b>Reports extended</b> with channel, store, staff and gender filters, loyalty activity as a percentage of total sales by revenue and order count, and month-on-month / year-on-year comparison.
+  <br><br>Dotsquares &middot; OSC Privilege Club Loyalty Solution &middot; Illustrative UI Structure v1.1 &middot; aligned to Proposal v1.1 &middot; 27 August 2026
+</div>
+</div>
+
+<script>
+/* ---------- shared markup builders ---------- */
+const NAV = [
+  ['Dashboard','M3 12 12 4l9 8M5 10v10h14V10'],
+  ['Customers','M16 20v-2a4 4 0 0 0-8 0v2M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7'],
+  ['Loyalty','M12 3 4 7v5c0 5 3.4 8 8 9 4.6-1 8-4 8-9V7l-8-4Z'],
+  ['Voucher management','M3 9V6h18v3a2 2 0 0 0 0 6v3H3v-3a2 2 0 0 0 0-6M9 6v12'],
+  ['Transactions','M4 7h16M4 7l3-3M4 7l3 3M20 17H4m16 0-3-3m3 3-3 3'],
+  ['Reports','M4 20V10m5 10V4m5 16v-7m5 7V8'],
+  ['Settings','M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.4-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.4l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4'],
+  ['Audit logs','M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 1 0 6 0M9 12h6m-6 4h4']
+];
+document.querySelectorAll('[data-nav]').forEach(nav=>{
+  const cur = +nav.dataset.nav;
+  let h = '<span class="grp">Programme</span>';
+  NAV.forEach((n,i)=>{
+    if(i===6) h += '<span class="grp">Configuration</span>';
+    const pill = (n[0]==='Customers'&&cur!==2) ? '' : '';
+    h += `<a href="#" class="${i+1===cur?'cur':''}" onclick="return false">
+      <svg viewBox="0 0 24 24"><path d="${n[1]}"/></svg>${n[0]}
+      ${n[0]==='Voucher management'?'<span class="pill">918</span>':''}</a>`;
+  });
+  nav.innerHTML = h;
+});
+
+const TILES = [
+  ['Search products','M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14M20 20l-4-4'],
+  ['Custom sale','M12 5v14M5 12h14'],
+  ['Add discount','M9 15 15 9M9.5 9.5h.01M14.5 14.5h.01M4 6h16v12H4z'],
+  ['Gift card','M4 8h16v11H4zM4 8l3-3 5 3 5-3 3 3M12 8v11'],
+  ['Café menu','M4 7h13v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4zM17 8h2a2 2 0 0 1 0 5h-2'],
+  ['Delivery order','M3 7h11v9H3zM14 10h4l3 3v3h-7M6 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3m11 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3'],
+  ['Returns','M4 9h11a4 4 0 0 1 0 8H9M4 9l4-4M4 9l4 4']
+];
+document.querySelectorAll('[data-grid]').forEach(g=>{
+  const attached = g.dataset.grid==='2';
+  let h = `<div class="tile loyal"><span class="badge">${attached?'ATTACHED':'LOYALTY'}</span>
+      <svg viewBox="0 0 24 24"><path d="M12 3 4 7v5c0 5 3.4 8 8 9 4.6-1 8-4 8-9V7l-8-4Z"/></svg>
+      ${attached?'M. Whitfield<br><span style="font-weight:400;font-size:11px;color:#C3D3CC">£15 to spend</span>':'Privilege Club'}</div>`;
+  TILES.forEach(t=>{ h += `<div class="tile"><svg viewBox="0 0 24 24"><path d="${t[1]}"/></svg>${t[0]}</div>`; });
+  g.innerHTML = h;
+});
+
+const LINES = `
+  <div class="ci"><span>Japanese acer 'Bloodgood'<span>1 × £42.00 &middot; earns points</span></span><span class="mono">£42.00</span></div>
+  <div class="ci"><span>Terracotta pot, 30cm<span>1 × £18.00 &middot; earns points</span></span><span class="mono">£18.00</span></div>
+  <div class="ci"><span>Bulb collection<span>1 × £12.40 &middot; sale item — still earns</span></span><span class="mono">£12.40</span></div>`;
+const CARTS = {
+  plain:`<h6>Basket <span class="mono">3 items</span></h6>${LINES}
+    <div class="sum"><div><span>Subtotal</span><span class="mono">£72.40</span></div>
+      <div><span>Loyalty</span><span style="color:var(--muted)">No member attached</span></div>
+      <div><span>Total</span><span class="tot">£72.40</span></div></div>
+    <button class="paybtn">Charge £72.40</button>`,
+  attached:`<h6>Basket <span class="mono">3 items</span></h6>${LINES}
+    <div class="attached"><div class="r1"><span class="av">MW</span> Margaret Whitfield <span class="tag t-ok" style="margin-left:auto">Active</span></div>
+      <div class="r2">£15 available &middot; will earn <b>72 points</b> on the full £72.40 &middot; pending 30 days</div></div>
+    <div class="sum"><div><span>Subtotal</span><span class="mono">£72.40</span></div>
+      <div><span>Points on completion</span><span class="mono plus">+72</span></div>
+      <div><span>Total</span><span class="tot">£72.40</span></div></div>
+    <button class="paybtn">Charge £72.40</button>`,
+  voucher:`<h6>Basket <span class="mono">3 items</span></h6>${LINES}
+    <div class="ci disc"><span><b>Privilege Club reward</b><span>2 × £5 increments</span></span><b class="mono">−£10.00</b></div>
+    <div class="attached"><div class="r1"><span class="av">MW</span> Margaret Whitfield <span class="tag t-ok" style="margin-left:auto">Active</span></div>
+      <div class="r2">£5 left after this sale &middot; will earn <b>62 points</b> &middot; pending 30 days</div></div>
+    <div class="sum"><div><span>Subtotal</span><span class="mono">£72.40</span></div>
+      <div><span>Reward applied</span><span class="mono" style="color:var(--ok)">−£10.00</span></div>
+      <div><span>Points on completion</span><span class="mono plus">+62</span></div>
+      <div><span>Total</span><span class="tot">£62.40</span></div></div>
+    <button class="paybtn">Charge £62.40</button>`
+};
+document.querySelectorAll('[data-cart]').forEach(c=>{ c.innerHTML = CARTS[c.dataset.cart]; });
+
+/* ---------- navigation ---------- */
+document.querySelectorAll('.surftab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.surftab').forEach(x=>x.setAttribute('aria-selected', x===t));
+  document.querySelectorAll('.surface').forEach(s=>s.classList.toggle('on', s.id==='s-'+t.dataset.surf));
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+document.querySelectorAll('.chips').forEach(group=>{
+  group.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
+    group.querySelectorAll('.chip').forEach(x=>x.setAttribute('aria-selected', x===c));
+    const scope = group.closest('.surface');
+    scope.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on', s.id===c.dataset.scr));
+  });
+});
+
+/* ---------- live rules preview (Settings) ---------- */
+const rf = ['r-earn','r-thr','r-val','r-bday'].map(id=>document.getElementById(id));
+function recalc(){
+  const thr = Math.max(1, +rf[1].value||100), val = +rf[2].value||5, pts = 340;
+  const inc = Math.floor(pts/thr), money = inc*val, used = inc*thr, left = pts-used, toNext = thr-left;
+  document.getElementById('pv-val').textContent = '£'+money;
+  document.getElementById('pv-note').textContent =
+    `${used} points used · ${left} carried forward · ${toNext} points to the next £${val}`;
+}
+rf.forEach(f=>f&&f.addEventListener('input',recalc));
+</script>

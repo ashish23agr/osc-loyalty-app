@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Oxford Staging</title>
+
+    <!--
+      Two scripts, and both are needed.
+
+      app-bridge.js registers the App Bridge elements — ui-nav-menu, ui-modal,
+      ui-title-bar, ui-save-bar — and provides the session-token fetch
+      interception. Its meta tag must come before it.
+
+      polaris.js registers the Polaris web components: every s-* element the app
+      renders. App Bridge does NOT register them; it only reads s-page to lift
+      the heading and actions into the admin title bar. Without this second tag
+      every s-* stays an unknown inline element and the app renders as unstyled
+      text with the App Bridge navigation working perfectly beside it — which is
+      exactly how this was missed. See the boot guard in src/app/polarisGuard.js.
+
+      Both are classic scripts, so they execute before the app bundle, which Vite
+      emits as a module and is therefore deferred.
+    -->
+    <meta name="shopify-api-key" content="%VITE_SHOPIFY_API_KEY%" />
+    <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+    <script src="https://cdn.shopify.com/shopifycloud/polaris.js"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

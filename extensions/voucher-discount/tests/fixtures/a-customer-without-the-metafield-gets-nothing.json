@@ -1,0 +1,59 @@
+{
+  "payload": {
+    "export": "cart-lines-discounts-generate-run",
+    "target": "cart.lines.discounts.generate.run",
+    "input": {
+      "cart": {
+        "cost": {
+          "subtotalAmount": {
+            "amount": "60.0"
+          },
+          "totalAmount": {
+            "amount": "60.0"
+          }
+        },
+        "requestedRedemption": null,
+        "redemptionReference": null,
+        "buyerIdentity": {
+          "isAuthenticated": true,
+          "customer": {
+            "id": "gid://shopify/Customer/5001",
+            "loyalty": null
+          }
+        },
+        "retailLocation": null,
+        "lines": [
+          {
+            "id": "gid://shopify/CartLine/0",
+            "quantity": 1,
+            "cost": {
+              "subtotalAmount": {
+                "amount": "60.0"
+              }
+            },
+            "merchandise": {
+              "__typename": "ProductVariant",
+              "id": "gid://shopify/ProductVariant/0",
+              "product": {
+                "isGiftCard": false,
+                "loyaltyExcluded": null
+              }
+            }
+          }
+        ]
+      },
+      "discount": {
+        "discountClasses": [
+          "ORDER",
+          "PRODUCT"
+        ]
+      },
+      "shop": {
+        "loyaltyConfig": null
+      }
+    },
+    "output": {
+      "operations": []
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "loyalty-tile",
+  "version": "0.0.1",
+  "license": "UNLICENSED",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  }
+}
