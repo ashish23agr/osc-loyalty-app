@@ -1649,6 +1649,17 @@ become wrong again, and the guard will not catch it because both sides would
 agree. Recorded rather than fixed, because inventing multi-currency formatting
 for a single-currency programme is scope nobody asked for.
 
+**TRIGGER — the condition under which this becomes wrong again.** If OSC ever
+runs a programme denominated in anything other than GBP, **both guards go
+blind**: V13 compares the shop currency with the rules currency and V18 compares
+the till currency with the rules currency, so if the rules move to EUR alongside
+a EUR shop and EUR tills, every comparison agrees and every `£` in
+`discountTitle()` and `formatPence()` is silently wrong on receipts and at the
+till. Neither guard can catch it, by construction, because they check agreement
+and not the symbol. **Changing `RuleSet::currency()` away from GBP is therefore
+a change that requires the formatting to be fixed in the same commit**, and this
+line exists so that whoever makes it finds out here rather than from a customer.
+
 *Exposure before the fix.* Nil in production — OSC's tills are UK. Live on the
 development store, which is exactly where it was found.
 
