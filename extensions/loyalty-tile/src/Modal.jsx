@@ -7,7 +7,7 @@ import {resolveAppUrl} from './lib/appUrl.js';
 import {enrolmentProblem, toPayload, validate} from './lib/enrolment.js';
 import {canScan, fromScan, hintFor} from './lib/lookup.js';
 import {formatPence, stepDown, stepUp} from './lib/money.js';
-import {refusalFor} from './lib/reasons.js';
+import {messageFor, refusalFor} from './lib/reasons.js';
 import {isConnected} from './lib/tileState.js';
 
 export default async () => {
@@ -185,16 +185,9 @@ function Lookup({api, onFound, onEnrol}) {
     setSearching(false);
 
     if (!response.ok) {
-      setProblem(
-        response.error === 'unreachable'
-          ? 'The loyalty system could not be reached. Continue the sale.'
-          // A misconfigured build rather than anything the assistant did, and
-          // worth saying so: this exact state ran silently for a day because it
-          // was indistinguishable from "no members found".
-          : response.error === 'no_app_url'
-            ? 'Loyalty is not configured for this device. Continue the sale and report it.'
-            : 'That search could not be run.',
-      );
+      // V17: the reason the server gave, not a generic one. Unknown codes fall
+      // through to the server's own sentence rather than to a shrug.
+      setProblem(messageFor(response));
 
       return;
     }
@@ -234,7 +227,11 @@ function Lookup({api, onFound, onEnrol}) {
           ) : null}
         </s-section>
 
-        {problem ? <s-banner tone="critical"><s-text>{problem}</s-text></s-banner> : null}
+        {problem ? (
+          <s-banner tone="critical" heading={problem.title}>
+            <s-text>{problem.detail}</s-text>
+          </s-banner>
+        ) : null}
 
         {searching ? <s-text>Searching…</s-text> : null}
 
@@ -307,7 +304,10 @@ function MemberView({api, member, session, onBack}) {
       }
 
       if (!response.ok) {
-        setProblem(refusalFor(null));
+        // V17: a transport or authorisation failure is NOT a basket refusal.
+        // This read "Redemption is not available" for a missing staff role,
+        // which blames the sale for something the sale had no part in.
+        setProblem(messageFor(response));
 
         return;
       }
@@ -344,7 +344,8 @@ function MemberView({api, member, session, onBack}) {
     setBusy(false);
 
     if (!response.ok) {
-      setProblem(refusalFor(null));
+      // V17, as above: only `payload.reason` is a basket refusal.
+      setProblem(messageFor(response));
 
       return;
     }
