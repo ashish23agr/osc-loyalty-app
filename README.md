@@ -291,7 +291,7 @@ exactly the slow-acknowledgement problem the queue exists to avoid.
 ```
 read_customers, write_customers, read_orders,
 read_discounts, write_discounts, read_locations,
-read_products, write_products
+read_markets, read_products, write_products
 ```
 
 | Scope | What needs it |
@@ -301,6 +301,7 @@ read_products, write_products
 | `write_products` | The per-product exclusion flag the function reads (V6a) |
 | `read_discounts`, `write_discounts` | Creating the function-backed automatic discount (V5) |
 | `read_locations` | Naming the store on a till redemption (MD10) |
+| `read_markets` | Reading market currency and tax-inclusive pricing, which is per market and not a shop setting (V12, V13) |
 
 **Status: granted on the development store 31 Aug 2026**, except
 `write_products`, which was added afterwards for V6a and needs one further
