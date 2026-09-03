@@ -856,6 +856,7 @@ none is silently assumed.
 | **V15** | **`@shopify/ui-extensions` installed at 2025.10.16 while the loyalty tile declares `api_version = "2026-07"`** - nothing pins the two together - found 3 Sep 2026 | `OUTSTANDING` - not blocking; resolve before trusting any conclusion drawn from those types | Sprint 3 tail |
 | **V16** | **Every till user needs a Privilege Club role and only the first staff member on a shop is bootstrapped** — an unassigned assistant gets `403 no_role_assigned` and the tile looks broken — found 3 Sep 2026 | `OUTSTANDING` — **BLOCKS GO-LIVE**; the implicit-viewer decision is parked next to C9 | Before production |
 | **V17** | **The tile discards the reason a request failed**, mapping every error but two to "That search could not be run." — raised 3 Sep 2026 | `OUTSTANDING` — small fix; third time in one day that a swallowed error cost time | Sprint 3 tail |
+| **V19** | **The tile listens for `onPress` and `onSubmit`, which POS components never emit** — nine buttons, the results list, the step controls and redeem are all inert — found 3 Sep 2026 | `OUTSTANDING` — **BLOCKS SPRINT 3**; steps 9-12 were never reachable | Sprint 3 |
 
 ### V1 — UI layer · `RESOLVED` 2026-08-26, **corrected 2026-08-27**
 
@@ -1510,6 +1511,72 @@ evidence that was already in hand. Related: the testing rule recorded at
 `RULE 2026-09-03`, which is the same failure in a different medium — evidence
 discarded rather than never gathered.
 
+### V19 — The tile listens for events the POS components never emit · `OUTSTANDING` · **blocks Sprint 3**
+
+Found 3 Sep 2026, diagnosing why member search does nothing on Android POS. The
+search box was the first symptom, not the defect.
+
+*What is wrong.* `Modal.jsx` wires its controls to `onPress` and `onSubmit`.
+Neither is an event these components emit. Preact maps an `onX` prop on a custom
+element to a listener for event `x`, so a wrong name attaches a listener that
+never fires — silently, with no error and no warning.
+
+| Handler | Sites | Event emitted? | Result |
+| --- | --- | --- | --- |
+| `onInput` | 7 | yes | works — the hint line under the search box updates as you type |
+| `onSubmit` | 1 | **no** | the search can never be run |
+| `onPress` | 9 | **no** | **every button, the results list, the step controls, redeem, enrol and cancel are all dead** |
+| `onClick` | 1, in `Tile.jsx` | yes | works — the tile opens the modal |
+
+*The evidence, from two independent directions.*
+
+From the types: `ClickableJSXProps` exposes `onClick`; `ButtonJSXProps` exposes
+`onClick`; `SearchFieldJSXProps` exposes `onInput`, `onChange`, `onBlur` and
+`onFocus` and **no `onSubmit`**; and `onPress` appears in **zero files** in the
+whole of `@shopify/ui-extensions`.
+
+From the device, which matters more because V15's version skew makes the types
+untrustworthy on their own: `Tile.jsx` uses `onClick` and the tile opens;
+`onInput` fires and the hints move; `onPress` and `onSubmit` produce nothing at
+all. **The device has already run the experiment on both names.** So this
+conclusion does not rest on the types, which is the only reason it can be
+trusted while V15 is open.
+
+*What it actually costs.* Not just search. Every one of these is inert:
+selecting a member from the results (`s-clickable`), both enrol entry points, the
+£5 step up and step down controls, **the redeem button**, enrol submit, cancel
+and back. **Steps 9 to 12 of the dev-store script were never reachable**, and
+would not have been even if search had worked.
+
+*Why the deep-link preview surface appeared to work.* Search ran there this
+morning and the results list rendered. Most likely that surface renders through a
+browser-based host where `s-search-field` wraps a native search input inside a
+form, so pressing Enter fires a native, bubbling `submit` — while native Android
+POS has no form and emits nothing. **This is inference, not established.** Worth
+noting that nobody ever tapped a result on that surface either: "searches return
+the member" meant the list appeared, which needs no handler at all.
+
+*Why no test caught it, and this is the fourth instance.* `tile.test.js` states
+its own scope in its docblock — *"The POS tile's logic, tested without rendering
+POS"* — and imports only from `src/lib/`. **It never imports `Modal.jsx` or
+`Tile.jsx`.** So the pure functions are thoroughly tested and every event name is
+entirely uncovered. Same shape as C14 and the `appUrl` defect: the wiring is
+invisible to tests that exercise what the wiring calls. See the rule at
+`RULE 2026-09-03`; this is its fourth instance in two days and the second where
+the untested seam was a single word.
+
+*The fix, not yet built.* Rename the nine `onPress` handlers to `onClick`. Replace
+the search field's `onSubmit` with a **visible search button** using `onClick` —
+which is also the right answer on its own merits, because a soft-keyboard submit
+is not a discoverable affordance for a till user: an assistant types a name, sees
+nothing, and has nothing to press. That was raised separately and is absorbed
+here. Then add coverage that asserts the handler names the components actually
+support, rather than testing `lib/` alone.
+
+*Not to be confused with V17.* V17 was the tile discarding a reason it had been
+given. This is the tile never asking. Both were invisible for the same underlying
+reason: a failure with no wording looks exactly like a feature that does nothing.
+
 ## 7. Change log
 
 | Date | Change |
@@ -1577,3 +1644,4 @@ discarded rather than never gathered.
 | 2026-09-03 | **POS Pro confirmed Active on both development-store locations, closing it as an open receivable.** "Shop location" (United States, the store default) and "My Custom Location" (123 Main St, Toronto, Canada). Two consequences: location attribution is now properly testable, so **step B2 of the dev-store script requires two DISTINCT `shopify_location_id` values from sales at the two locations** rather than merely non-NULL at one - a hardcoded default would pass the old check; and **neither location is in the UK and the US one is the default, corroborating V12** further. Location addresses deliberately left alone: fewer moving variables while the tile is being diagnosed, and V12 closes on the live store regardless. MD10 still targets one location for the production matrix. |
 | 2026-09-03 | **POS tile base URL fixed, and the pattern behind it written down as a rule.** `shopify.environment?.appUrl ?? ''` was always `''` - POS supplies no app URL at any version, confirmed against the 2026-07 docs - so every till request went to a relative path that reaches nothing from the extension sandbox. The URL is now compiled in via `resolveAppUrl()` in `extensions/loyalty-tile/src/lib/appUrl.js`, rewritten by `web/serve.mjs` at dev start from the tunnel handshake, so a tunnel change needs no manual edit and no extension redeploy. `TillApi` now refuses any base that is not an absolute https origin, returning `no_app_url` rather than issuing a relative fetch, and the tile says so. **Third instance of a test supplying what production derives** (after C14, plus one in miniature the same day), so it is recorded as a standing rule: *if a test supplies what production derives, something else must test the derivation.* Extension suite 53/53, backend 453/2057, Pint clean. |
 | 2026-09-03 | **The POS tile reached the backend for the first time, and the first real POS token was rejected 403 `no_role_assigned`.** Search worked from the deep-link preview surface, which authenticates as the installing account (`113711382768`, bootstrapped Administrator), and failed from POS proper, signed in as `113711437936`. Not the tile: `staff_roles` held one row and `StaffRoleResolver` grants nothing to an unrecognised staff member on a shop that already has roles. **V16 raised and gated for go-live** — every OSC till user needs a role assigned, and whether POS staff get an implicit `viewer` floor is parked next to C9. **V17 raised** — the tile rendered that 403 as "That search could not be run.", discarding a message precise enough to act on, which is the third swallowed error to cost time today. `113711437936` granted `agent` directly in the database to unblock the run (not via `PUT /api/admin/staff/{staffId}`, so no audit row). |
+| 2026-09-03 | **V19: the POS tile listens for events its components never emit, so almost nothing in it works.** Member search doing nothing on Android POS was the first symptom, not the defect. `Modal.jsx` wires 9 controls to `onPress` and the search field to `onSubmit`; POS emits neither, and Preact attaches a listener for the literal event name, so they fail silently. `onPress` appears in **zero files** in `@shopify/ui-extensions`; `Clickable` and `Button` expose `onClick`, `SearchField` exposes `onInput`/`onChange`/`onBlur`/`onFocus`. **The device settled it independently of the types**, which matters while V15 is open: `Tile.jsx` uses `onClick` and the tile opens, `onInput` fires and the hints update, `onPress`/`onSubmit` do nothing. **Steps 9-12 were never reachable** — selecting a member, the step controls, redeem, enrol and cancel are all inert. No test caught it because `tile.test.js` tests "without rendering POS" and never imports the JSX: **fourth instance** of the untested-wiring pattern recorded as a rule this morning. |
