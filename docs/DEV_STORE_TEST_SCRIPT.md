@@ -268,6 +268,35 @@ echo 'ref=', \$r->reference, ' location=', var_export(\$r->shopify_location_id, 
 **✅ Staff attribution passes if `staff=` carries the pinned staff member's id**
 (and, if the pinned member differs from the signed-in user, both).
 
+### B2 - two locations, two distinct ids (strengthened 3 Sep 2026)
+
+POS Pro is Active on **both** locations of the development store, so location
+attribution can be tested properly rather than merely observed:
+
+| Location | Address | Notes |
+| --- | --- | --- |
+| Shop location | United States | the store **default** |
+| My Custom Location | 123 Main St, Toronto, Canada | |
+
+Non-NULL on a single location proves only that *a* value arrived, which a
+hardcoded default would also satisfy. Run the sale **once from each location**
+— switch location in POS, which starts a new session — and compare:
+
+```bash
+php artisan tinker --engine=psy --execute="
+App\Models\Redemption::where('channel','pos')->latest('id')->take(2)->get()
+  ->each(fn (\$r) => print(\$r->reference.'  location='.var_export(\$r->shopify_location_id, true).PHP_EOL));"
+```
+
+**✅ B2 passes only if the two ids are DIFFERENT, and each matches the location
+the sale was actually taken at.** Two identical ids across two locations is a
+failure even though both are non-NULL — it means the tile is reporting something
+other than the live POS session.
+
+Note MD10 still targets **one** location for the production device matrix. Two
+locations here is a testing opportunity, not a change to what OSC must run.
+
+
 ---
 
 ## C. End to end, with the reference on the receipt

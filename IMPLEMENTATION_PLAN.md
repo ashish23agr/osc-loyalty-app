@@ -1566,7 +1566,7 @@ moment they are late.
 **Receivables from OSC**
 
 - [x] Shopify admin and Partner access
-- [ ] POS Pro subscription (blocks Sprint 3 device testing)
+- [x] POS Pro subscription — **confirmed Active on both development-store locations, 3 Sep 2026**
 - [ ] Klaviyo private API key (blocks Sprint 4 live wiring)
 - [ ] Dynamics / ORD export with field schema (blocks Sprint 5)
 - [ ] Gender metafield on development and live stores

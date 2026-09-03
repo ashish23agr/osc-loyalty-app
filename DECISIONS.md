@@ -787,6 +787,36 @@ Device testing targets **one location**: iPad 10th generation, POS app 11.11.1,
 a single POS Pro store. This narrows the Sprint 3 device matrix from "a real POS
 terminal" to a specific, testable configuration.
 
+**POS Pro closed 3 Sep 2026.** Confirmed **Active on both** development-store
+locations, so it is no longer an open receivable or a gate on Sprint 3 device
+testing:
+
+| Location | Address | Notes |
+| --- | --- | --- |
+| Shop location | United States | the store **default** |
+| My Custom Location | 123 Main St, Toronto, Canada | |
+
+Two consequences, both recorded rather than acted on:
+
+**Location attribution becomes properly testable.** MD10 still targets one
+location for the *production* device matrix, and that is unchanged. But two POS
+Pro locations on the development store means the store-location-per-POS-transaction
+requirement can be asserted rather than merely observed: a sale from each
+location must produce **two distinct `shopify_location_id` values**, each
+matching where the sale was taken. Non-NULL on a single location would be
+satisfied by a hardcoded default, so it was never a real check.
+`docs/DEV_STORE_TEST_SCRIPT.md` step **B2** now states this as the pass
+criterion.
+
+**Neither location is in the UK, and the US one is the default** — further
+corroboration for V12. The development store cannot present a UK-domiciled
+merchant from any angle: the merchant address is locked to the United States,
+and now the POS locations are United States and Canada. Deliberately **not**
+changed, on the reasoning that fewer moving variables while the tile is being
+diagnosed is worth more than a UK address that still would not settle V12 — V12
+closes on the live store regardless. See the V12 entry.
+
+
 ---
 
 ## 5. Open questions
@@ -1132,6 +1162,15 @@ whole of what V12 asks. That agreement is arithmetic, not evidence: it holds onl
 if Shopify's `taxLines` are post-allocation, which is precisely the fact no test
 can supply.
 
+*Further corroboration, 3 Sep 2026.* POS Pro was confirmed Active on both
+development-store locations, and **neither is in the UK**: "Shop location"
+(United States, the store default) and "My Custom Location" (Toronto, Canada).
+So the store cannot present a UK-domiciled merchant from any angle - locked US
+merchant address, and now US and Canadian POS locations. The addresses were
+deliberately left unchanged: fewer moving variables while the POS tile is being
+diagnosed is worth more than a UK address that still would not clear the £135
+rule. Nothing here reopens the dev-store route.
+
 *Status.* `OUTSTANDING`, and a **hard go-live gate** on the checklist in
 `PROGRESS.md` — not merely noted. Two sessions were spent trying to settle it on
 the development store; that route is closed and should not be reopened.
@@ -1383,3 +1422,4 @@ it already does for the Admin API version.
 | 2026-09-03 | **`read_markets` added to the access scopes**, in `shopify.app.toml`, `web/.env` and `web/.env.example` together, after two sessions spent inferring market currency and tax-inclusive pricing from `contextualPricing` because the config could not be read. Forces one merchant re-authorisation under the legacy install flow, and invalidates the stored offline session until it happens — `loadOfflineSession` refuses a token whose granted scopes no longer match the configured set. The deploy that publishes the 3 Sep tunnel URLs carries this change too, so the re-grant must follow the deploy, not precede it. |
 | 2026-09-03 | **The development store market configuration read directly, after `read_markets` was granted.** Three ACTIVE REGION markets (United Kingdom GBP, Canada CAD, United States USD); the UK market carries `inclusiveTaxPricingStrategy: INCLUDES_TAXES_IN_PRICE_BASED_ON_COUNTRY`, which is the £720 shown against a stored £600. **No primary market exists and that is not a fault** — 2026-07 `MarketType` has no `PRIMARY` value and `Market` has no `primary` or `enabled` field. The market configuration is correct, so **V12 is blocked solely by the locked US merchant address and the £135 rule and nothing in Markets can unblock it.** Ends two sessions of inferring this from `contextualPricing`. |
 | 2026-09-03 | **The POS tile search request never reaches the backend, and the route is not at fault.** Confirmed state (a): no line for `/api/admin/members` in the dev request log. The endpoint, params and auth are all correct - the extension sends `q` and `per_page`, `MemberController@index` defaults `field` to `all`, every param passes `MemberSearchRequest`, and all five identifiers find account 10. CORS is fine too: a live preflight from `extensions.shopifycdn.com` returns 204 with the right headers. The suspect is `Modal.jsx` line 43, `shopify.environment?.appUrl ?? ''` - **the 2026-07 POS UI extensions docs state that no API gives an extension its app URL**, and the worked example hardcodes it, so `appUrl` is almost certainly the empty string. A temporary modal-open diagnostic was committed to read the runtime and is to be reverted once read. **V15 raised** for the `@shopify/ui-extensions` version skew. |
+| 2026-09-03 | **POS Pro confirmed Active on both development-store locations, closing it as an open receivable.** "Shop location" (United States, the store default) and "My Custom Location" (123 Main St, Toronto, Canada). Two consequences: location attribution is now properly testable, so **step B2 of the dev-store script requires two DISTINCT `shopify_location_id` values from sales at the two locations** rather than merely non-NULL at one - a hardcoded default would pass the old check; and **neither location is in the UK and the US one is the default, corroborating V12** further. Location addresses deliberately left alone: fewer moving variables while the tile is being diagnosed, and V12 closes on the live store regardless. MD10 still targets one location for the production matrix. |
