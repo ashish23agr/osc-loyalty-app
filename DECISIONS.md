@@ -854,6 +854,8 @@ none is silently assumed.
 | **V13** | **Nothing checks that the shop currency and the rules currency agree** — a live defect, found 3 Sep 2026 | `OUTSTANDING` — fix before go-live; not a gate while both are GBP | Sprint 3 tail |
 | **V14** | **A compensating `earn_reversal` carries no `qualifying_value_pence`, so reported spend overstates what the member actually spent** — found 3 Sep 2026 | `OUTSTANDING` — reporting only; points and segmentation are correct | Sprint 5 |
 | **V15** | **`@shopify/ui-extensions` installed at 2025.10.16 while the loyalty tile declares `api_version = "2026-07"`** - nothing pins the two together - found 3 Sep 2026 | `OUTSTANDING` - not blocking; resolve before trusting any conclusion drawn from those types | Sprint 3 tail |
+| **V16** | **Every till user needs a Privilege Club role and only the first staff member on a shop is bootstrapped** — an unassigned assistant gets `403 no_role_assigned` and the tile looks broken — found 3 Sep 2026 | `OUTSTANDING` — **BLOCKS GO-LIVE**; the implicit-viewer decision is parked next to C9 | Before production |
+| **V17** | **The tile discards the reason a request failed**, mapping every error but two to "That search could not be run." — raised 3 Sep 2026 | `OUTSTANDING` — small fix; third time in one day that a swallowed error cost time | Sprint 3 tail |
 
 ### V1 — UI layer · `RESOLVED` 2026-08-26, **corrected 2026-08-27**
 
@@ -1409,6 +1411,105 @@ figures. The base-URL test constructs `TillApi` with no `appUrl` at all and
 asserts `fetchImpl` was never called, which is the precise condition the device
 was in. A regression test nobody has seen fail is a hypothesis.
 
+### V16 — Every till user needs a Privilege Club role, and only the first one is bootstrapped · `OUTSTANDING` · **blocks go-live**
+
+Found 3 Sep 2026, on the first real POS session token ever to reach the backend.
+
+*What happened.* Search worked from the deep-link preview surface and then failed
+from POS proper with a generic "That search could not be run." The cause was not
+the tile: `EnsureStaffRole` resolved the POS user through `staff_roles`, found
+nothing, and returned **403 `no_role_assigned`**. The preview surface had
+authenticated as the account that installed the app — staff id
+`113711382768`, bootstrapped as Administrator on 27 Aug 2026 — while the device
+was signed in as a different Shopify user, `113711437936`.
+
+*Why it is a go-live gate and not a dev-store quirk.*
+`StaffRoleResolver::bootstrapFirstAdministrator()` grants Administrator to the
+**first** staff member on a shop with no roles, once per shop, and by design
+"an unrecognised staff member on a shop that already has roles gets nothing".
+That is correct for the console, where an Administrator assigns roles
+deliberately. It is a problem at a till: **every OSC staff member who opens the
+tile needs a role assigned before it will do anything.** A new Saturday
+assistant gets a 403, and to them the app is simply broken.
+
+*The decision to make, parked next to C9.* Should POS staff receive an implicit
+`viewer` floor — enough to look up a member and see a balance, with `agent`
+still required to hold or void a redemption? C9 already asks whether a till
+assistant on a lower role should be able to act at all, and this is the same
+question arriving from the other direction. **Not to be settled now.** The
+options, so nobody re-derives them:
+
+1. **Implicit viewer for a verified POS token.** The tile works for everyone the
+   moment POS is signed in; redemption still needs an assigned `agent`. Cheapest
+   for OSC, and it means a verified staff identity is trusted for *reading* where
+   today it is trusted for nothing.
+2. **Explicit assignment for everyone.** No code change. Requires an onboarding
+   step per staff member, and a documented one, or this recurs on every new hire.
+3. **Bootstrap on first POS use** the way the console bootstraps the first
+   Administrator. Rejected on sight for granting a role to whoever happens to
+   open the tile first, but recorded because it will be suggested.
+
+*What must happen before go-live either way.* If option 2 stands, the onboarding
+step goes in the runbook and OSC has to be told. If option 1 is chosen it is a
+change to `EnsureStaffRole` with its own tests. **Neither is done, and the tile
+is unusable by any unassigned staff member until one of them is.**
+
+*Dev-store state.* `113711437936` was granted `agent` directly in the database
+on 3 Sep 2026 to unblock the POS run — not through
+`PUT /api/admin/staff/{staffId}`, so there is no audit row for it. See V17 for
+the separate matter of the tile hiding the reason.
+
+### V17 — The tile discards the reason a request failed · `OUTSTANDING`
+
+Raised 3 Sep 2026. Small fix, and the third time in one day that swallowing a
+specific error cost real time.
+
+*What it is.* `Lookup` in `Modal.jsx` maps every failure to one of two strings:
+
+```js
+response.error === 'unreachable'
+  ? 'The loyalty system could not be reached. Continue the sale.'
+  : response.error === 'no_app_url'
+    ? 'Loyalty is not configured for this device. Continue the sale and report it.'
+    : 'That search could not be run.'
+```
+
+Everything else lands in that last branch. So `EnsureStaffRole` returning
+**403 `no_role_assigned`** with the message *"This staff member has no Privilege
+Club role. An Administrator must assign one."* — a reason precise enough to act
+on without help — reached the till as "That search could not be run."
+`TillApi.request()` already captures `payload.error.code` and
+`payload.error.message`; the tile simply drops them.
+
+*The cost, three times on 3 Sep 2026.*
+
+1. `appUrl` empty produced a relative request that reached nothing, and the tile
+   reported no members — indistinguishable from a member who does not exist.
+   Fixed, and `no_app_url` now has its own words.
+2. The 403 above presented as the same generic string, and the diagnosis needed
+   a resolver test and a `staff_roles` query to reach a conclusion the response
+   body already stated.
+3. In miniature: the search failure and an empty result set look identical to
+   whoever is standing at the till, so "it did not work" is all anyone can
+   report.
+
+*Why it matters more at a till than in the console.* There is a customer waiting
+and no developer present. The person who can act on *"an Administrator must
+assign one"* is the assistant reading it; nobody can act on "that search could
+not be run".
+
+*The fix.* Surface the reason. Map the codes the backend actually returns —
+`no_role_assigned`, `role_floor_not_met`, `invalid_session_token` — to wording a
+staff member can act on, and fall back to the server's own
+`payload.error.message` when there is one rather than to a generic string.
+`lib/reasons.js` already exists for refusal wording and is the natural home.
+
+*The rule this is an instance of.* A specific, actionable error that the client
+replaces with a generic one is worse than no message, because it destroys
+evidence that was already in hand. Related: the testing rule recorded at
+`RULE 2026-09-03`, which is the same failure in a different medium — evidence
+discarded rather than never gathered.
+
 ## 7. Change log
 
 | Date | Change |
@@ -1475,3 +1576,4 @@ was in. A regression test nobody has seen fail is a hypothesis.
 | 2026-09-03 | **The POS tile search request never reaches the backend, and the route is not at fault.** Confirmed state (a): no line for `/api/admin/members` in the dev request log. The endpoint, params and auth are all correct - the extension sends `q` and `per_page`, `MemberController@index` defaults `field` to `all`, every param passes `MemberSearchRequest`, and all five identifiers find account 10. CORS is fine too: a live preflight from `extensions.shopifycdn.com` returns 204 with the right headers. The suspect is `Modal.jsx` line 43, `shopify.environment?.appUrl ?? ''` - **the 2026-07 POS UI extensions docs state that no API gives an extension its app URL**, and the worked example hardcodes it, so `appUrl` is almost certainly the empty string. A temporary modal-open diagnostic was committed to read the runtime and is to be reverted once read. **V15 raised** for the `@shopify/ui-extensions` version skew. |
 | 2026-09-03 | **POS Pro confirmed Active on both development-store locations, closing it as an open receivable.** "Shop location" (United States, the store default) and "My Custom Location" (123 Main St, Toronto, Canada). Two consequences: location attribution is now properly testable, so **step B2 of the dev-store script requires two DISTINCT `shopify_location_id` values from sales at the two locations** rather than merely non-NULL at one - a hardcoded default would pass the old check; and **neither location is in the UK and the US one is the default, corroborating V12** further. Location addresses deliberately left alone: fewer moving variables while the tile is being diagnosed, and V12 closes on the live store regardless. MD10 still targets one location for the production matrix. |
 | 2026-09-03 | **POS tile base URL fixed, and the pattern behind it written down as a rule.** `shopify.environment?.appUrl ?? ''` was always `''` - POS supplies no app URL at any version, confirmed against the 2026-07 docs - so every till request went to a relative path that reaches nothing from the extension sandbox. The URL is now compiled in via `resolveAppUrl()` in `extensions/loyalty-tile/src/lib/appUrl.js`, rewritten by `web/serve.mjs` at dev start from the tunnel handshake, so a tunnel change needs no manual edit and no extension redeploy. `TillApi` now refuses any base that is not an absolute https origin, returning `no_app_url` rather than issuing a relative fetch, and the tile says so. **Third instance of a test supplying what production derives** (after C14, plus one in miniature the same day), so it is recorded as a standing rule: *if a test supplies what production derives, something else must test the derivation.* Extension suite 53/53, backend 453/2057, Pint clean. |
+| 2026-09-03 | **The POS tile reached the backend for the first time, and the first real POS token was rejected 403 `no_role_assigned`.** Search worked from the deep-link preview surface, which authenticates as the installing account (`113711382768`, bootstrapped Administrator), and failed from POS proper, signed in as `113711437936`. Not the tile: `staff_roles` held one row and `StaffRoleResolver` grants nothing to an unrecognised staff member on a shop that already has roles. **V16 raised and gated for go-live** — every OSC till user needs a role assigned, and whether POS staff get an implicit `viewer` floor is parked next to C9. **V17 raised** — the tile rendered that 403 as "That search could not be run.", discarding a message precise enough to act on, which is the third swallowed error to cost time today. `113711437936` granted `agent` directly in the database to unblock the run (not via `PUT /api/admin/staff/{staffId}`, so no audit row). |
