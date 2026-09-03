@@ -823,6 +823,7 @@ none is silently assumed.
 | **V12** | **Earn base on a tax-INCLUSIVE shop: the order of the discount-allocation and tax subtractions** | `OUTSTANDING` — **BLOCKS GO-LIVE**; unprovable on the dev store, closed by live-store reconciliation | Before production |
 | **V13** | **Nothing checks that the shop currency and the rules currency agree** — a live defect, found 3 Sep 2026 | `OUTSTANDING` — fix before go-live; not a gate while both are GBP | Sprint 3 tail |
 | **V14** | **A compensating `earn_reversal` carries no `qualifying_value_pence`, so reported spend overstates what the member actually spent** — found 3 Sep 2026 | `OUTSTANDING` — reporting only; points and segmentation are correct | Sprint 5 |
+| **V15** | **`@shopify/ui-extensions` installed at 2025.10.16 while the loyalty tile declares `api_version = "2026-07"`** - nothing pins the two together - found 3 Sep 2026 | `OUTSTANDING` - not blocking; resolve before trusting any conclusion drawn from those types | Sprint 3 tail |
 
 ### V1 — UI layer · `RESOLVED` 2026-08-26, **corrected 2026-08-27**
 
@@ -1274,6 +1275,50 @@ tax display `Dynamic`, the three markets above, gift card variants stocked and
 sellable, one free `Standard` shipping rate and one £5.82 rate that was priced
 during the EUR window and needs deleting and re-adding.
 
+### V15 — `@shopify/ui-extensions` is on 2025.10.16 while the extension declares `api_version = "2026-07"` · `OUTSTANDING`
+
+Raised 3 Sep 2026 while diagnosing why the POS tile's search request never
+reaches the backend.
+
+*What the skew is.* `extensions/loyalty-tile/shopify.extension.toml` declares
+`api_version = "2026-07"`, and `ShopifyConfigurationTest` keeps that in step with
+the Admin API version. The installed types package is
+`@shopify/ui-extensions 2025.10.16`. The extension has no dependency on it of its
+own — `extensions/loyalty-tile/package.json` lists only `vitest` — so the version
+comes from the root install and nothing pins it to the declared api_version or
+fails the build on drift, unlike the api_version check itself.
+
+*Why it matters, and it is narrower than it sounds.* It does not change what the
+POS host does at runtime: the host provides the `shopify` global, and a types
+package cannot alter it. What it does undermine is **evidence**. The current
+diagnosis of the tile — that `shopify.environment` is not part of the POS API
+surface, because `appUrl` appears nowhere in the package and `StandardApi`
+composes no `EnvironmentApi` — is drawn from the 2025.10.16 types. If the surface
+gained an `environment` in 2026-07, that reasoning is reading a stale map.
+`StandardApi`'s `{[key: string]: any}` index signature means the types would not
+have complained either way, so this is exactly the case where a stale package is
+invisible.
+
+**How to apply.** Do not treat any conclusion about what the POS host injects as
+settled until the installed package matches the declared api_version, or until
+the runtime output from the modal-open diagnostic contradicts or confirms it
+directly. Runtime evidence outranks the types here.
+
+*Narrowed 3 Sep 2026, same day.* The specific conclusion about `appUrl` no
+longer rests on the types at all: the POS UI extensions documentation for
+**2026-07** states that no API gives an extension its app URL, and its own
+worked example hardcodes `https://YOUR_DEVELOPMENT_SERVER/api/...`. So the
+absence of `shopify.environment` is documented for the declared version, not
+merely absent from a stale package. The skew still matters for every OTHER
+inference drawn from those types, which is why this stays open.
+
+*Not blocking.* The modal-open diagnostic reads the runtime rather than the
+types, so it is authoritative regardless of which package version is installed.
+Resolve the skew before relying on the types again - and consider whether the
+extension should depend on `@shopify/ui-extensions` explicitly, pinned, with
+`ShopifyConfigurationTest` asserting it against the declared api_version the way
+it already does for the Admin API version.
+
 ## 7. Change log
 
 | Date | Change |
@@ -1337,3 +1382,4 @@ during the EUR window and needs deleting and re-adding.
 | 2026-09-03 | **V14 raised: a compensating `earn_reversal` carries no `qualifying_value_pence`.** Account 10 sums to 60000 against a real qualifying spend of £550, because entry 22 holds the value and the correcting entry 25 leaves it `NULL`. Reporting only — `ProgrammeSummary` and `MemberPresenter` aggregate the column; points, balances and maturity never read it, and `SegmentSweep` works from a last-spend date rather than an amount. Held as a **Sprint 5 gate** rather than fixed, because the candidate fix changes what the column means and reporting has to agree with that first. |
 | 2026-09-03 | **`read_markets` added to the access scopes**, in `shopify.app.toml`, `web/.env` and `web/.env.example` together, after two sessions spent inferring market currency and tax-inclusive pricing from `contextualPricing` because the config could not be read. Forces one merchant re-authorisation under the legacy install flow, and invalidates the stored offline session until it happens — `loadOfflineSession` refuses a token whose granted scopes no longer match the configured set. The deploy that publishes the 3 Sep tunnel URLs carries this change too, so the re-grant must follow the deploy, not precede it. |
 | 2026-09-03 | **The development store market configuration read directly, after `read_markets` was granted.** Three ACTIVE REGION markets (United Kingdom GBP, Canada CAD, United States USD); the UK market carries `inclusiveTaxPricingStrategy: INCLUDES_TAXES_IN_PRICE_BASED_ON_COUNTRY`, which is the £720 shown against a stored £600. **No primary market exists and that is not a fault** — 2026-07 `MarketType` has no `PRIMARY` value and `Market` has no `primary` or `enabled` field. The market configuration is correct, so **V12 is blocked solely by the locked US merchant address and the £135 rule and nothing in Markets can unblock it.** Ends two sessions of inferring this from `contextualPricing`. |
+| 2026-09-03 | **The POS tile search request never reaches the backend, and the route is not at fault.** Confirmed state (a): no line for `/api/admin/members` in the dev request log. The endpoint, params and auth are all correct - the extension sends `q` and `per_page`, `MemberController@index` defaults `field` to `all`, every param passes `MemberSearchRequest`, and all five identifiers find account 10. CORS is fine too: a live preflight from `extensions.shopifycdn.com` returns 204 with the right headers. The suspect is `Modal.jsx` line 43, `shopify.environment?.appUrl ?? ''` - **the 2026-07 POS UI extensions docs state that no API gives an extension its app URL**, and the worked example hardcodes it, so `appUrl` is almost certainly the empty string. A temporary modal-open diagnostic was committed to read the runtime and is to be reverted once read. **V15 raised** for the `@shopify/ui-extensions` version skew. |
