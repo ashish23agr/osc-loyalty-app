@@ -1264,6 +1264,72 @@ test environment and the parts that must be right are decisions, not markup.
 
 ---
 
+## Per-module status audit — 3 Sep 2026
+
+Requested before sprint planning. Three states only: **BUILT AND VERIFIED**,
+**BUILT, UNVERIFIED**, **NOT BUILT**. Where verification is possible only on
+OSC's live store it is marked **[LIVE ONLY]** with the checklist reference, so
+this does not read greener than the evidence supports.
+
+**Read the artificiality entry in `DECISIONS.md` alongside this.** Every
+"verified" below except the ledger arithmetic was verified against a development
+store whose merchant address is locked to the US and whose currency configuration
+was set up by accident. That does not invalidate the evidence, but it bounds it.
+
+### Customer-facing — NOT BUILT. Nothing exists.
+
+Asked first because it is the shortest answer in the set and the most consequential.
+
+```
+extensions/    loyalty-tile (POS)    voucher-discount (function)
+grep customer-account | customerAccount  across extensions, app, frontend  ->  no matches
+```
+
+There is **no customer account extension, no storefront surface, and no
+customer-facing anything**. A member cannot see their own balance, points
+history, vouchers or expiry warnings by any route. Every balance in the system is
+visible only to staff — through the console, or read aloud across a counter.
+
+Two open items, both Sprint 4, neither started: **V11** (customer account UI
+extension target and deployability under the legacy install flow — never spiked)
+and **C1** (the storefront redemption control, still blocked on OSC, and the only
+substantial build left in Sprint 3).
+
+**Roughly half the programme's value — a member seeing their own balance — has no
+implementation and no verification story.**
+
+### The rest
+
+| Module | Status | Evidence, or what is missing |
+| --- | --- | --- |
+| Ledger, earning, refunds, reversals, maturity, expiry, segmentation | **BUILT AND VERIFIED** | 461 backend tests / 2,078 assertions. C14 fixed and proven by replay against real order `#1002`; `loyalty:verify-ledger` reconciles every cached balance |
+| Online redemption — single-use discount code | **BUILT AND VERIFIED** | Dev-store script A1–A4 passed 2 Sep 2026: code minted, applied at a real checkout, `state=confirmed`, `points_consumed=1000`, unused quote swept to `void`. The only path fully exercised against a real shop |
+| Admin console | **BUILT, PARTIALLY** | Six real screens — Dashboard, Customers, Member profile, Loyalty, Audit, Settings — and 134 frontend tests. **Three screens are still placeholders: Vouchers, Transactions, Reports** |
+| POS tile | **BUILT, PARTIALLY VERIFIED** | Steps 1–5 pass 3 Sep 2026: search, tapping through, member screen, steppers. **Redemption has never completed.** Every control in the modal was inert until V19 was fixed the same day |
+| POS redemption success path | **BUILT, UNVERIFIED** — [LIVE ONLY unless a UK location is added, checklist A1–A3] | The V18 guard's refusal path is verified twice; the happy path needs a GBP till and this store has none |
+| Online enrolment | **BUILT, UNVERIFIED** | `POST /api/admin/members` with the D10 duplicate-email check, covered in the suite. Never exercised from a storefront — and there is no storefront |
+| Klaviyo flows | **BUILT AS A SEAM, NOT WIRED** — [LIVE ONLY, checklist B4] | `EventBus` plus `NullEventBus`; all five events emit from real call sites and are dropped. No live driver and no API key |
+| The five reports | **NOT BUILT** — [LIVE ONLY to verify, checklist B3] | `ReportsScreen` is a placeholder and no report endpoints exist. V10 outstanding |
+| Migration | **NOT BUILT** — [LIVE ONLY, checklist B6] | No import command, no importer, nothing referencing the Dynamics/ORD export. Segmentation already reads a `last_qualifying_spend_at` column that nothing populates |
+| Earn base on a tax-inclusive order | **UNVERIFIED** — [LIVE ONLY, checklist B1] | V12. Only the tax-exclusive branch is proved, and the branch that ships is the other one |
+| Till-user roles | **UNVERIFIED** — [LIVE ONLY, checklist B2] | V16. Only the first staff member on a shop is bootstrapped; every other till user 403s until assigned |
+
+### Three cautions against reading this as progress
+
+1. **"Verified" means verified on an artificial store**, everywhere except the
+   ledger arithmetic. Online redemption is the strongest evidence in the project
+   and it still ran against a US-addressed, then-EUR shop.
+2. **The POS tile is the standing warning.** It was "built" for days, carried 31
+   passing tests, and every control in it was dead — search, member selection,
+   the steppers, redeem, enrol, cancel. Steps 1–5 passing on 3 Sep 2026 is the
+   first real evidence any of it worked. Four defects in two days (V17, V18, V19
+   and the `appUrl` one) all came from the same place: the parts no test could
+   see.
+3. **Nothing customer-facing exists**, and no sprint has yet been planned that
+   builds it.
+
+---
+
 ## Verified by the suites vs. verified on a shop
 
 **This is the most important distinction in the handover.** 413 backend tests
