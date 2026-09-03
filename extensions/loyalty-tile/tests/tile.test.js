@@ -239,7 +239,12 @@ describe('the till API client', () => {
   test('a staff member with no app permission is a state, not a crash', async () => {
     const api = new TillApi({
       getSessionToken: async () => undefined,
-      appUrl: '',
+      // A real base URL, because the subject here is the missing TOKEN. This
+      // read `''` until 3 Sep 2026, which meant that once TillApi learned to
+      // refuse an unusable base the test stopped reaching its own subject and
+      // asserted the base guard instead. Incidental fixture values decide what
+      // a test proves; see appUrl.test.js.
+      appUrl: 'https://app.example.com',
       fetchImpl: async () => {
         throw new Error('should not be called');
       },

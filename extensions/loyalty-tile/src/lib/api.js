@@ -18,7 +18,33 @@ export class TillApi {
     this.fetchImpl = fetchImpl;
   }
 
+  /**
+   * An absolute https origin, and nothing else will do.
+   *
+   * https because POS refuses to fetch any non-HTTPS request outright, and
+   * absolute because a relative path does not resolve to the app from inside
+   * the extension sandbox.
+   */
+  static isUsableBase(appUrl) {
+    return typeof appUrl === 'string' && /^https:\/\/[^/\s]+$/.test(appUrl);
+  }
+
   async request(path, {method = 'GET', body = null} = {}) {
+    // An unconfigured base URL is a refusal, not a relative request.
+    //
+    // This is the defect of 3 Sep 2026 and the reason it took a day to find.
+    // `appUrl` resolved to '', so every call went to the relative
+    // `/api/admin/...`, which from the POS sandbox reaches nothing: no request
+    // arrived, no error was raised, and the tile simply returned no members.
+    // POS gives an extension no way to discover its own app URL — confirmed
+    // against the 2026-07 docs — so an empty base is always a build
+    // misconfiguration and never a transient condition. Refusing loudly here
+    // costs one comparison and turns a silent day into a legible message, which
+    // is the same bargain the rest of this class already makes.
+    if (!TillApi.isUsableBase(this.appUrl)) {
+      return {ok: false, error: 'no_app_url', status: 0};
+    }
+
     let token;
 
     try {
