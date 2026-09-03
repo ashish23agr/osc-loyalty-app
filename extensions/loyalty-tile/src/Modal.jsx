@@ -45,6 +45,30 @@ function Extension() {
     [],
   );
 
+  // TEMPORARY DIAGNOSTIC - REVERT THIS COMMIT ONCE READ. 3 Sep 2026.
+  // The POS tile's search request never reaches the backend: confirmed (a),
+  // zero lines for /api/admin/members in the `shopify app dev` request log
+  // while laravel.log and the audit log show nothing either. The suspicion is
+  // that `shopify.environment` is not part of the POS API surface at all - it
+  // appears in no POS type and `appUrl` appears nowhere in
+  // @shopify/ui-extensions - so `appUrl` resolves to '' and the fetch goes to
+  // a relative path that never leaves the extension sandbox. These three lines
+  // establish what the host actually provides at runtime; nothing is fixed
+  // here, and the injection site above is deliberately untouched.
+  useEffect(() => {
+    const safe = (value) => {
+      try {
+        return JSON.stringify(value);
+      } catch (cause) {
+        return 'UNSERIALISABLE: ' + String(cause);
+      }
+    };
+
+    console.log('[oxford-diag] shopify.environment =', safe(shopify.environment));
+    console.log('[oxford-diag] shopify.session.currentSession =', safe(shopify.session?.currentSession));
+    console.log('[oxford-diag] constructed search URL =', `${api.appUrl}/api/admin/members?q=TEST&per_page=10`);
+  }, [api]);
+
   useEffect(() => {
     const unsubscribe = shopify.connectivity?.current?.subscribe?.((state) => {
       setConnected(isConnected(state));
