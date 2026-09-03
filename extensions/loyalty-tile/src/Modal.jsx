@@ -5,7 +5,7 @@ import {useCallback, useEffect, useMemo, useState} from 'preact/hooks';
 import {TillApi} from './lib/api.js';
 import {resolveAppUrl} from './lib/appUrl.js';
 import {enrolmentProblem, toPayload, validate} from './lib/enrolment.js';
-import {canScan, fromScan, hintFor} from './lib/lookup.js';
+import {canScan, classify, fromScan, hintFor} from './lib/lookup.js';
 import {formatPence, stepDown, stepUp} from './lib/money.js';
 import {messageFor, refusalFor} from './lib/reasons.js';
 import {isConnected} from './lib/tileState.js';
@@ -229,9 +229,24 @@ function Lookup({api, onFound, onEnrol}) {
             placeholder="Search"
             value={term}
             onInput={(event) => setTerm(event.target.value)}
-            onSubmit={() => search(term)}
           />
           <s-text color="subdued">{hintFor(term)}</s-text>
+
+          {/*
+            V19: a real button, not a soft-keyboard submit. `s-search-field`
+            emits no `submit` event at all, so the old `onSubmit` handler was
+            never reachable by any gesture - but a keyboard key would have been
+            the wrong answer even if it worked. An assistant at a till types a
+            name and needs something to press; there is no discoverable
+            affordance in "press the magnifying glass on your keyboard".
+          */}
+          <s-button
+            variant="primary"
+            disabled={searching || classify(term) === 'empty'}
+            onClick={() => search(term)}
+          >
+            Search
+          </s-button>
 
           {canScan(scanners) ? (
             <s-text color="subdued">Or scan the member's card.</s-text>
@@ -249,14 +264,14 @@ function Lookup({api, onFound, onEnrol}) {
         {results !== null && results.length === 0 ? (
           <s-section heading="No member found">
             <s-text>Nobody matches that. Check the spelling, or enrol them now.</s-text>
-            <s-button onPress={onEnrol}>Enrol this customer</s-button>
+            <s-button onClick={onEnrol}>Enrol this customer</s-button>
           </s-section>
         ) : null}
 
         {results?.length ? (
           <s-section heading={`${results.length} match${results.length === 1 ? '' : 'es'}`}>
             {results.map((found) => (
-              <s-clickable key={found.id} onPress={() => onFound(found)}>
+              <s-clickable key={found.id} onClick={() => onFound(found)}>
                 <s-stack direction="block">
                   <s-text type="strong">{found.display_name ?? found.card_number}</s-text>
                   <s-text color="subdued">
@@ -271,7 +286,7 @@ function Lookup({api, onFound, onEnrol}) {
         ) : null}
 
         <s-section>
-          <s-button variant="secondary" onPress={onEnrol}>Enrol a new member</s-button>
+          <s-button variant="secondary" onClick={onEnrol}>Enrol a new member</s-button>
         </s-section>
       </s-screen>
     </s-navigator>
@@ -424,7 +439,7 @@ function MemberView({api, member, session, onBack}) {
               <s-button
                 variant="secondary"
                 disabled={busy || chosen <= increment}
-                onPress={() => setChosen(stepDown(chosen, increment))}
+                onClick={() => setChosen(stepDown(chosen, increment))}
               >
                 −{formatPence(increment)}
               </s-button>
@@ -432,19 +447,19 @@ function MemberView({api, member, session, onBack}) {
               <s-button
                 variant="secondary"
                 disabled={busy || chosen >= maximum}
-                onPress={() => setChosen(stepUp(chosen, maximum, increment))}
+                onClick={() => setChosen(stepUp(chosen, maximum, increment))}
               >
                 +{formatPence(increment)}
               </s-button>
             </s-stack>
-            <s-button variant="primary" disabled={busy} onPress={redeem}>
+            <s-button variant="primary" disabled={busy} onClick={redeem}>
               {busy ? 'Applying…' : `Apply ${formatPence(chosen)}`}
             </s-button>
           </s-section>
         ) : null}
 
         <s-section>
-          <s-button variant="secondary" onPress={onBack}>Find another member</s-button>
+          <s-button variant="secondary" onClick={onBack}>Find another member</s-button>
         </s-section>
       </s-screen>
     </s-navigator>
@@ -536,10 +551,10 @@ function Enrol({api, onCancel, onEnrolled}) {
         </s-section>
 
         <s-section>
-          <s-button variant="primary" disabled={busy} onPress={submit}>
+          <s-button variant="primary" disabled={busy} onClick={submit}>
             {busy ? 'Enrolling…' : 'Enrol'}
           </s-button>
-          <s-button variant="secondary" onPress={onCancel}>Cancel</s-button>
+          <s-button variant="secondary" onClick={onCancel}>Cancel</s-button>
         </s-section>
       </s-screen>
     </s-navigator>
