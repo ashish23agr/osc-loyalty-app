@@ -8,13 +8,40 @@ import {isBasketFixable, refusalFor} from '../src/lib/reasons.js';
 import {isConnected, tileState} from '../src/lib/tileState.js';
 
 /**
- * The POS tile's logic, tested without rendering POS.
+ * The POS tile's logic — and ONLY its logic.
  *
- * The components are deliberately thin over these modules, because a POS surface
- * cannot be rendered in a test environment and the parts that have to be RIGHT —
- * what the tile says when the till is offline, what the step control may offer,
- * what a refusal reads as, whether a duplicate enrolment is treated as a failure
- * — are all decisions rather than markup.
+ * **Read this as a warning, not a design note.** The original wording here,
+ * "tested without rendering POS", was written as a reasonable trade-off and
+ * turned into the reason a broken tile shipped: on 3 Sep 2026 this file passed
+ * 31 tests while the search box, the member list, the £5 step controls, the
+ * redeem button, both enrol paths, cancel and back were **all inert**. Nine
+ * controls were wired to `onPress` and the search field to `onSubmit`, and POS
+ * emits neither. Nothing here could have noticed, because nothing here imports
+ * `Modal.jsx` or `Tile.jsx`.
+ *
+ * So the scope is real but it is a LIMIT, and the limit has a shape worth
+ * naming: **this file tests the functions the markup calls, never the markup
+ * that calls them.** Anything that lives in a JSX attribute — a handler name, a
+ * prop name, whether a control exists at all — is invisible from here.
+ *
+ * What covers that gap:
+ *
+ *   handlerContract.test.js  every `on*` handler in the source, checked against
+ *                            the installed component types. It is the test that
+ *                            would have failed on `onPress`, and the only
+ *                            reason a fifth instance is unlikely.
+ *   appUrl.test.js           the base URL derivation, after a construction site
+ *                            supplied `''` for as long as the tile existed.
+ *   reasons.test.js          the wording a failure reaches the till as.
+ *
+ * None of those render POS either. Rendering is still not free — see V19 in
+ * DECISIONS.md for what it would cost — but "cannot be rendered" was never a
+ * reason to leave the markup entirely unchecked, and it is not one now.
+ *
+ * The decisions below are genuinely decisions rather than markup, and testing
+ * them here is right: what the tile says when the till is offline, what the step
+ * control may offer, what a refusal reads as, whether a duplicate enrolment is
+ * treated as a failure.
  */
 
 describe('the offline rule (C7)', () => {
