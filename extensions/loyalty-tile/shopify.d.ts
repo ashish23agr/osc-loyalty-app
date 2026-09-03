@@ -27,6 +27,12 @@ declare module './src/lib/api.js' {
 }
 
 //@ts-ignore
+declare module './src/lib/appUrl.js' {
+  const shopify: import('@shopify/ui-extensions/pos.home.modal.render').Api;
+  const globalThis: { shopify: typeof shopify };
+}
+
+//@ts-ignore
 declare module './src/lib/enrolment.js' {
   const shopify: import('@shopify/ui-extensions/pos.home.modal.render').Api;
   const globalThis: { shopify: typeof shopify };
