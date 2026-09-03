@@ -17,9 +17,77 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const handshakePath = join(here, 'storage', 'app', 'dev-tunnel.json');
 
+const tomlPath = join(here, '..', 'shopify.app.toml');
+
 const port = process.env.BACKEND_PORT || process.env.PORT || 8000;
 const host = process.env.BACKEND_HOST || '127.0.0.1';
 const tunnel = process.env.HOST || process.env.APP_URL || '';
+
+// The CLI injects SCOPES once, when `shopify app dev` STARTS, and that value is
+// what builds the OAuth consent URL. Editing shopify.app.toml afterwards does
+// not reach this process, and neither does restarting the backend - the value
+// lives in the parent CLI process. So a scope added to the toml mid-session is
+// requested by nobody: the consent screen appears, the merchant accepts, and
+// the grant comes back with the OLD scope set. On 3 Sep 2026 that cost a full
+// uninstall-and-reinstall of the app to discover, because everything about it
+// looks like it worked - `read_markets` was in the toml, in web/.env, and in the
+// deployed app version, and simply absent from the session it granted.
+function checkScopes() {
+  const injected = process.env.SCOPES || '';
+
+  if (injected === '') {
+    return;
+  }
+
+  let declared;
+
+  try {
+    const match = readFileSync(tomlPath, 'utf8').match(/^\s*scopes\s*=\s*"([^"]*)"/m);
+
+    if (!match) {
+      return;
+    }
+
+    declared = match[1];
+  } catch {
+    // No toml to compare against: nothing useful to say.
+    return;
+  }
+
+  const asSet = (value) =>
+    new Set(
+      value
+        .split(',')
+        .map((scope) => scope.trim())
+        .filter(Boolean),
+    );
+
+  const declaredSet = asSet(declared);
+  const injectedSet = asSet(injected);
+  const missing = [...declaredSet].filter((scope) => !injectedSet.has(scope));
+  const extra = [...injectedSet].filter((scope) => !declaredSet.has(scope));
+
+  if (missing.length === 0 && extra.length === 0) {
+    return;
+  }
+
+  console.warn('');
+  console.warn('[oxford-staging] SCOPE MISMATCH - OAuth will request the wrong scopes.');
+  console.warn(`[oxford-staging]   shopify.app.toml declares: ${[...declaredSet].sort().join(',')}`);
+  console.warn(`[oxford-staging]   this dev session injected:  ${[...injectedSet].sort().join(',')}`);
+
+  if (missing.length > 0) {
+    console.warn(`[oxford-staging]   MISSING from the running session: ${missing.sort().join(',')}`);
+  }
+
+  if (extra.length > 0) {
+    console.warn(`[oxford-staging]   only in the running session: ${extra.sort().join(',')}`);
+  }
+
+  console.warn('[oxford-staging] A grant made now would NOT include the missing scopes.');
+  console.warn('[oxford-staging] Stop `shopify app dev` and start it again, then deploy and re-grant.');
+  console.warn('');
+}
 
 function writeHandshake() {
   if (!tunnel.startsWith('https://')) {
@@ -67,6 +135,7 @@ function clearHandshake() {
 }
 
 writeHandshake();
+checkScopes();
 
 console.log(`[oxford-staging] Laravel backend -> http://${host}:${port}`);
 

@@ -39,6 +39,8 @@ use App\Domain\Redemption\QuoteExpirySweep;
 use App\Domain\Redemption\RedemptionGateway;
 use App\Domain\Redemption\RedemptionService;
 use App\Domain\Rules\RulesVersionRepository;
+use App\Domain\Shop\AdminApiShopCurrency;
+use App\Domain\Shop\ShopCurrency;
 use App\Http\Presenters\MemberPresenter;
 use App\Support\Audit\AuditLogger;
 use App\Support\Audit\JobAuditor;
@@ -111,6 +113,12 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(DiscountCodeWriter::class, AdminApiDiscountCodeWriter::class);
         $this->app->singleton(DiscountCodeGateway::class);
+
+        // V13. Bound as an interface so the suite can state a shop currency
+        // without a shop; the implementation reads it live on every mint and
+        // caches nothing, because a stale answer here would pass the guard
+        // while being wrong. See App\Domain\Shop\AdminApiShopCurrency.
+        $this->app->singleton(ShopCurrency::class, AdminApiShopCurrency::class);
 
         $this->app->singleton(MetafieldWriter::class, AdminApiMetafieldWriter::class);
 

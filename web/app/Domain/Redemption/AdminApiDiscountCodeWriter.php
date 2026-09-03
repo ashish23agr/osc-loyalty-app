@@ -2,6 +2,7 @@
 
 namespace App\Domain\Redemption;
 
+use App\Domain\Shop\ShopCurrency;
 use App\Exceptions\ShopifyAdminApiException;
 use App\Services\ShopifyAdminApi;
 use DateTimeInterface;
@@ -48,6 +49,8 @@ final class AdminApiDiscountCodeWriter implements DiscountCodeWriter
     }
     GRAPHQL;
 
+    public function __construct(private readonly ShopCurrency $shopCurrency) {}
+
     public function create(
         string $shopDomain,
         string $code,
@@ -57,6 +60,28 @@ final class AdminApiDiscountCodeWriter implements DiscountCodeWriter
         DateTimeInterface $endsAt,
         int $minimumSubtotalPence,
     ): ?string {
+        // V13, defence in depth. `RedemptionService::hold()` has normally
+        // checked this already, and this is still worth its second Admin API
+        // read: this method is what actually puts money into a customer's
+        // hands, `$currencyCode` below is a value Shopify accepts and then
+        // IGNORES in favour of the shop's own currency, and any future caller
+        // that reaches the writer without going through `hold()` would
+        // reintroduce V13 in full. Refusing here returns null, which
+        // DiscountCodeGateway::publish() already handles as "the quote has
+        // nothing to apply".
+        $shopCurrency = $this->shopCurrency->for($shopDomain);
+
+        if ($shopCurrency === null || strcasecmp($shopCurrency, $currencyCode) !== 0) {
+            return $this->failed(
+                'mint',
+                $shopDomain,
+                $code,
+                'the shop is denominated in '.($shopCurrency ?? 'an unreadable currency')
+                    .' and the programme in '.$currencyCode
+                    .'; Shopify would have denominated this amount in the shop currency (V13)',
+            );
+        }
+
         $input = [
             // The reference is in the title as well as being the code, because
             // the title is what a merchant reads in the admin discount list and

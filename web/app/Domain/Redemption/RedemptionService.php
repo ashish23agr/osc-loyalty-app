@@ -9,6 +9,7 @@ use App\Domain\Loyalty\RedemptionLadder;
 use App\Domain\Orders\OrderSnapshot;
 use App\Domain\Rules\RuleSet;
 use App\Domain\Rules\RulesVersionRepository;
+use App\Domain\Shop\ShopCurrency;
 use App\Models\LedgerEntry;
 use App\Models\LoyaltyAccount;
 use App\Models\Redemption;
@@ -41,10 +42,30 @@ final class RedemptionService
     /** How long a quote stands before it has to be re-run against the basket. */
     public const QUOTE_MINUTES = 20;
 
+    /**
+     * The shop is denominated in a different currency from the programme (V13).
+     *
+     * Unlike every other refusal `hold()` can return, this one is not a rung of
+     * the D8 ladder — it is a misconfiguration, and it is a refusal rather than
+     * a warning because Shopify denominates a discount amount in the SHOP's
+     * currency and silently ignores the one we send. On 3 Sep 2026 that turned
+     * a £50 voucher into a €50 one with every other constraint correct.
+     */
+    public const CURRENCY_MISMATCH = 'currency_mismatch';
+
+    /**
+     * The shop currency could not be read at all, so agreement is unproven.
+     *
+     * Fails closed, and kept distinct from a known mismatch so the console can
+     * say "try again" rather than "your programme is misconfigured".
+     */
+    public const CURRENCY_UNKNOWN = 'currency_unknown';
+
     public function __construct(
         private readonly LedgerService $ledger,
         private readonly BalanceCalculator $balances,
         private readonly RulesVersionRepository $rules,
+        private readonly ShopCurrency $shopCurrency,
     ) {}
 
     /**
@@ -123,6 +144,36 @@ final class RedemptionService
                 // A refusal that already had a reason keeps it; one that only
                 // became nothing because the member asked for less gets its own.
                 'reason' => $quote['reason'] ?? RedemptionLadder::BELOW_VOUCHER_INCREMENT,
+            ];
+        }
+
+        // V13. Checked here rather than in either gateway because BOTH channels
+        // come through this method, so one guard covers the code path and the
+        // till at once — and checked after the refusals above, so a quote that
+        // was never going to mint anything does not spend an Admin API call.
+        //
+        // Before the transaction on purpose: a refusal must leave no row. A
+        // quote in `quoted` state with no offer behind it is the orphan the
+        // expiry sweep then has to reason about, for no gain.
+        $shopCurrency = $this->shopCurrency->for($account->shop_domain);
+        $rulesCurrency = $rules->currency();
+
+        if ($shopCurrency === null || strcasecmp($shopCurrency, $rulesCurrency) !== 0) {
+            $unknown = $shopCurrency === null;
+
+            Log::error('Refusing to hold a redemption: the shop and the programme disagree about currency', [
+                'shop' => $account->shop_domain,
+                'account' => $account->id,
+                'shop_currency' => $shopCurrency ?? 'unreadable',
+                'rules_currency' => $rulesCurrency,
+                'amount_pence' => $amount,
+                'channel' => $channel,
+            ]);
+
+            return [
+                'redemption' => null,
+                'quote' => $quote,
+                'reason' => $unknown ? self::CURRENCY_UNKNOWN : self::CURRENCY_MISMATCH,
             ];
         }
 

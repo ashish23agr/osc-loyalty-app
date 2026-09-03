@@ -40,6 +40,14 @@ final class PosCartDiscountGateway implements RedemptionGateway
     public function publish(LoyaltyAccount $account, Redemption $redemption): void
     {
         // The tile applies the discount itself, from the response it already has.
+        //
+        // V13 is enforced for this channel too, and deliberately NOT here.
+        // There is no mint to guard: by the time publish() is reached the
+        // redemption row exists and the amount has already been handed to the
+        // till. The check therefore lives in `RedemptionService::hold()`, which
+        // both channels come through, so a currency mismatch means this method
+        // is never called at all. `CurrencyGuardTest` proves that against this
+        // gateway specifically rather than assuming the online case covers it.
     }
 
     public function withdraw(LoyaltyAccount $account, ?Redemption $redemption = null): void
