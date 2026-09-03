@@ -820,8 +820,9 @@ none is silently assumed.
 | V9 | Klaviyo API revision and rate limits | `OUTSTANDING` | Sprint 4 |
 | V10 | Store-wide sales figure that reconciles with Shopify analytics | `OUTSTANDING` | Sprint 5 |
 | V11 | Customer account UI extension target and deployability under the legacy install flow | `OUTSTANDING` | Sprint 4 |
-| **V12** | **Earn base on a tax-INCLUSIVE shop: the order of the discount-allocation and tax subtractions** | `OUTSTANDING` — **BLOCKS GO-LIVE** | Before production |
+| **V12** | **Earn base on a tax-INCLUSIVE shop: the order of the discount-allocation and tax subtractions** | `OUTSTANDING` — **BLOCKS GO-LIVE**; unprovable on the dev store, closed by live-store reconciliation | Before production |
 | **V13** | **Nothing checks that the shop currency and the rules currency agree** — a live defect, found 3 Sep 2026 | `OUTSTANDING` — fix before go-live; not a gate while both are GBP | Sprint 3 tail |
+| **V14** | **A compensating `earn_reversal` carries no `qualifying_value_pence`, so reported spend overstates what the member actually spent** — found 3 Sep 2026 | `OUTSTANDING` — reporting only; points and segmentation are correct | Sprint 5 |
 
 ### V1 — UI layer · `RESOLVED` 2026-08-26, **corrected 2026-08-27**
 
@@ -1087,14 +1088,52 @@ subtracting both from `gross` may double-count the tax on the discounted portion
 Getting it wrong under-pays the member, which is the mirror of the C14 defect and
 just as invisible.
 
-*What would settle it.* Either switch the development store to tax-inclusive
-pricing and re-run a discounted order through A1–A3, or run one such order on
-the live store before launch and reconcile the earn by hand.
-`OrderPayloadMappingTest::test_tax_inclusive_takes_off_both_the_allocation_and_the_tax`
-locks in the current behaviour so a change to it is deliberate; it does not
-vouch for it.
+*Why the development store cannot settle it — established 3 Sep 2026, and this
+is now final.* Three facts compose into a wall. The dev store's merchant address
+is in the **United States** (`shop.billingAddress.countryCodeV2` reads `US`);
+Shopify's UK rules for a merchant located outside the UK do not require VAT to be
+collected at checkout on orders **over £135**; and the store address country is
+**locked on this store**, so the first fact cannot be changed. Every UK checkout
+above £135 therefore reverts to base pricing at the payment step, with no VAT
+line to reconcile.
 
-*Status.* On the **go-live checklist** in `PROGRESS.md`, not merely noted.
+It presents as a "Price update" modal on pressing Pay: the cart and checkout show
+the VAT-inclusive £720.00 that `Dynamic tax display` computes for a GB visitor,
+then checkout resolves that it will not collect UK VAT and re-prices to the
+stored £600.00. Reproduced twice on 3 Sep 2026 and abandoned deliberately rather
+than paid, because a £600 order with `taxesIncluded: false` and no tax lines is
+order `#1002` again and proves nothing. Confirmed independently by the
+abandoned checkout from 2 Sep 2026 19:34Z, which shipped to `SP4 6AB` and still
+recorded `taxesIncluded=false`, `tax 0.0`, no tax lines — after UK VAT collection
+had been enabled.
+
+A sub-£135 basket would be charged VAT even by a US-addressed store and would
+exercise the branch, but the £50 voucher against a basket that small collides
+with the D8 ladder rungs and is not the shape production has. Rejected as a
+route.
+
+*What settles it — the only remaining route.* **Reconcile one real discounted
+order on the live store before launch**, by hand: take the order's
+`discountedTotalSet`, its `discountAllocations` and its `taxLines`, compute
+`gross − allocations − tax`, and check the earn the member actually received
+against the VAT-exclusive value they actually spent. If Shopify computes
+`taxLines` post-allocation, as the code assumes, the two agree; if pre-allocation,
+the tax on the discounted portion is double-counted and the member is under-paid.
+`OrderPayloadMappingTest::test_tax_inclusive_takes_off_both_the_allocation_and_the_tax`
+locks in the current behaviour so a change to it is deliberate; it does not vouch
+for it.
+
+For the record, the arithmetic the dev store *would* have produced had it been
+able to charge VAT: gross £720.00, allocation £50.00, tax £111.67, giving a base
+of £558.33 — which equals the cross-check from the other direction, £600.00
+ex-VAT less the voucher's ex-VAT value of £41.67. The two bases agreeing is the
+whole of what V12 asks. That agreement is arithmetic, not evidence: it holds only
+if Shopify's `taxLines` are post-allocation, which is precisely the fact no test
+can supply.
+
+*Status.* `OUTSTANDING`, and a **hard go-live gate** on the checklist in
+`PROGRESS.md` — not merely noted. Two sessions were spent trying to settle it on
+the development store; that route is closed and should not be reopened.
 
 ### V13 — The shop currency and the rules currency are never compared · `OUTSTANDING`
 
@@ -1125,6 +1164,115 @@ trusting every caller.
 this is not a go-live gate — but the failure mode is silent, which is exactly
 the kind this register exists to stop being rediscovered. **Mine to have missed
 when the writer was written on 2 Sep 2026.**
+
+### V14 — A compensating reversal carries no qualifying value · `OUTSTANDING`
+
+Raised 3 Sep 2026, found while reading the ledger that the C14 replay left
+behind. Reporting only: no points figure and no segment is wrong because of it.
+
+*What is on the ledger.* Account 10, after order `#1002` was replayed to correct
+its earn:
+
+```
+22  earn            qvp=60000  parent=NULL  key=earn:order:7134863884528:t600
+25  earn_reversal   qvp=NULL   parent=22    key=earn:order:7134863884528:t550
+```
+
+Earning is cumulative and corrects by compensation, so the pair is right and the
+net earn is the intended 550 points. But `qualifying_value_pence` is carried on
+the original entry alone. The reversal leaves it `NULL`, so **the sum over the
+account still reads 60000** — £600 — while the member's qualifying spend on that
+order was £550. Reported spend overstates real spend by exactly the corrected
+amount, and it will do so for every replay, refund reversal and manual
+correction, silently and cumulatively.
+
+*Where it surfaces.* Two call sites, both aggregations over the same column:
+
+- `ProgrammeSummary` — `->sum('qualifying_value_pence')`, the programme-level
+  spend figure.
+- `MemberPresenter` — `coalesce(sum(qualifying_value_pence), 0) as spend`, the
+  per-member spend shown in the console.
+
+*Where it does not surface.* Points, balances and maturity never read the
+column. Segmentation does not either: `SegmentSweep` works from
+`LastSpendResolver` and a last-spend **date**, not an amount, so Active/Lapsed is
+unaffected. This is why it is a Sprint 5 reporting item and not a defect in the
+ledger.
+
+*The question to settle, which is why this is a gate and not a fix.* Should a
+compensating entry carry a **negative** `qualifying_value_pence` (here `-5000`,
+making the sum 55000), or should reported spend be derived some other way — for
+instance by summing only entries whose `parent_entry_id` is `NULL` and applying
+corrections separately? The first is a one-line change at the posting site and
+makes every existing aggregation correct without touching them. It also makes the
+column mean "the qualifying value this entry accounts for" rather than "the
+qualifying value of the order", which is a change of meaning that reporting in
+Sprint 5 has to agree with before it is made. **Do not fix this ahead of the
+Sprint 5 reporting design**; a silent change of meaning in a column that
+`ProgrammeSummary` already aggregates is how the C14 defect happened.
+
+*Exposure.* Live from the moment any correction is posted, which has already
+happened once on the development store. Nothing on the production store yet.
+Related: C14, V12.
+
+### The development store's market configuration, read rather than inferred · `SETTLED` 2026-09-03
+
+Two sessions were spent inferring this from `contextualPricing`, because the app
+had no `read_markets` scope and the Markets admin screen showed no market
+labelled "Primary". The scope was added on 3 Sep 2026 and the configuration read
+directly. Recorded here so nobody infers it a third time.
+
+```
+SHOP CURRENCY: GBP        MARKETS: 3
+
+United Kingdom  (united-kingdom)   status ACTIVE   type REGION
+   base currency    GBP
+   localCurrencies  false      roundingEnabled true
+   inclusiveTax     INCLUDES_TAXES_IN_PRICE_BASED_ON_COUNTRY
+   inclusiveDuties  ADD_DUTIES_AT_CHECKOUT
+   adaptivePricing  false
+   regions          United Kingdom
+
+Canada          (canada)           status ACTIVE   type REGION   base CAD
+United States   (us)               status ACTIVE   type REGION   base USD
+```
+
+**All three markets are ACTIVE.** The working hypothesis that the UK market was
+in `DRAFT` — which would have explained a cart pricing at £720 and a checkout
+refusing to — was wrong. Nothing in Markets is half-configured.
+
+**There is no primary market, and that is not a fault.** On API version 2026-07
+`MarketType` is `NONE, REGION, LOCATION, COMPANY_LOCATION, CHANNEL`; there is no
+`PRIMARY` value, and `Market` carries no `primary` or `enabled` field at all —
+both were removed and a query written against them fails outright. The admin
+list showing no "Primary" label was telling the truth rather than hiding a
+misconfiguration, and the earlier suspicion that "the shop baseline follows the
+primary market" could not have been checked the way it was framed.
+
+**`INCLUDES_TAXES_IN_PRICE_BASED_ON_COUNTRY` is the £720.** £600 × 1.2, from
+configuration rather than deduced from a price. This is the field the 2 Sep notes
+guessed at as `MarketPriceInclusions.inclusiveTaxPricingStrategy`, now read.
+
+*What this means for V12, and it is the important part.* **The market
+configuration is correct.** The UK market is active, GBP, and set to include VAT
+in displayed prices — everything V12 needs from Markets is already true. V12 is
+unprovable on this store purely because the merchant address is locked to the
+United States and Shopify does not require a non-UK merchant to collect UK VAT
+on orders over £135, so checkout re-prices to the £600 base at the payment step
+whatever Markets says. **Do not change anything in Markets hoping to unblock
+V12; there is nothing there to fix.** See the V12 entry.
+
+*What this means for V13.* The UK market's base currency is GBP, so the
+precondition V13 guards is genuinely satisfied rather than apparently so. Note
+that the guard deliberately compares the **shop** currency, not the market's:
+Shopify denominates a discount amount in the shop currency regardless of which
+market a customer is in, so the shop-level read is the correct check and reading
+markets does not change it.
+
+*Dev-store state as left on 3 Sep 2026.* Base currency GBP, UK VAT collecting,
+tax display `Dynamic`, the three markets above, gift card variants stocked and
+sellable, one free `Standard` shipping rate and one £5.82 rate that was priced
+during the EUR window and needs deleting and re-adding.
 
 ## 7. Change log
 
@@ -1185,3 +1333,7 @@ when the writer was written on 2 Sep 2026.**
 | 2026-09-03 | **The development store's base currency changed from GBP to EUR during tax configuration, which invalidated the V12 run.** `shop.currencyCode` read `GBP` earlier in the session and on order `#1002`; it now reads `EUR`. The £600 snowboard is a €600 product, and the UK market presents it converted — which is the whole explanation for the £524.00 subtotal seen at checkout (€600 × ~0.8733 = £523.98). **It was read as a tax figure and it never was one**; there was no VAT line to find. Suspected cause is the primary market's currency, since the shop baseline follows it, but this is unconfirmed — **check Settings → Markets (which market is Primary, and its currency) and Settings → General (Store currency) before changing anything.** Note Shopify normally refuses to change a base currency once a store has orders, and this one has `#1001` and `#1002`. |
 | 2026-09-03 | **V13 raised: nothing compares the shop currency with the rules currency**, so a €50 voucher was minted for a GBP programme with every other constraint correct. `pointsFor()` is currency-blind, so confirming it would have spent 1000 points regardless. Quote `PC-40690629` was voided unused rather than applied. See the V13 entry. |
 | 2026-09-03 | **V12 remains OUTSTANDING and gated — not settled tonight.** UK VAT collection was enabled successfully (Settings → Taxes and duties → Regional settings → United Kingdom → Collect VAT) and the market's **Tax display** was already set to `Dynamic tax display`, so step 2 changed nothing — the missing piece had been collection, and `#1002` had neither collection nor a UK destination. The run was then stopped by the currency finding above rather than by anything in the code. **V12's alternative route stands: reconcile one real discounted order on the live store before launch.** Dev-store state left as: UK VAT collecting, tax display Dynamic, base currency EUR, gift card variants stocked and sellable. |
+| 2026-09-03 | **V12 is unprovable on the development store and the attempt is parked.** The store address is locked to the United States, and Shopify does not require a non-UK merchant to collect UK VAT on orders over £135, so every UK checkout above that reverts to base pricing at the payment step — reproduced twice, with a "Price update" modal striking £720.00 through in favour of the stored £600.00. Neither order was paid, since a £600 order with no tax lines is `#1002` again. **V12 stays a hard go-live gate, now closable only by reconciling one real discounted order on the live store before launch.** Development-store state left deliberately UK-realistic: GBP base currency, UK VAT collecting, `Dynamic tax display`, GB market configured. |
+| 2026-09-03 | **V14 raised: a compensating `earn_reversal` carries no `qualifying_value_pence`.** Account 10 sums to 60000 against a real qualifying spend of £550, because entry 22 holds the value and the correcting entry 25 leaves it `NULL`. Reporting only — `ProgrammeSummary` and `MemberPresenter` aggregate the column; points, balances and maturity never read it, and `SegmentSweep` works from a last-spend date rather than an amount. Held as a **Sprint 5 gate** rather than fixed, because the candidate fix changes what the column means and reporting has to agree with that first. |
+| 2026-09-03 | **`read_markets` added to the access scopes**, in `shopify.app.toml`, `web/.env` and `web/.env.example` together, after two sessions spent inferring market currency and tax-inclusive pricing from `contextualPricing` because the config could not be read. Forces one merchant re-authorisation under the legacy install flow, and invalidates the stored offline session until it happens — `loadOfflineSession` refuses a token whose granted scopes no longer match the configured set. The deploy that publishes the 3 Sep tunnel URLs carries this change too, so the re-grant must follow the deploy, not precede it. |
+| 2026-09-03 | **The development store market configuration read directly, after `read_markets` was granted.** Three ACTIVE REGION markets (United Kingdom GBP, Canada CAD, United States USD); the UK market carries `inclusiveTaxPricingStrategy: INCLUDES_TAXES_IN_PRICE_BASED_ON_COUNTRY`, which is the £720 shown against a stored £600. **No primary market exists and that is not a fault** — 2026-07 `MarketType` has no `PRIMARY` value and `Market` has no `primary` or `enabled` field. The market configuration is correct, so **V12 is blocked solely by the locked US merchant address and the £135 rule and nothing in Markets can unblock it.** Ends two sessions of inferring this from `contextualPricing`. |
