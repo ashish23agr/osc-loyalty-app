@@ -283,7 +283,7 @@ hardcoded default would also satisfy. Run the sale **once from each location**
 — switch location in POS, which starts a new session — and compare:
 
 ```bash
-php artisan tinker --engine=psy --execute="
+php artisan tinker --execute="
 App\Models\Redemption::where('channel','pos')->latest('id')->take(2)->get()
   ->each(fn (\$r) => print(\$r->reference.'  location='.var_export(\$r->shopify_location_id, true).PHP_EOL));"
 ```
