@@ -1358,6 +1358,57 @@ extension should depend on `@shopify/ui-extensions` explicitly, pinned, with
 `ShopifyConfigurationTest` asserting it against the declared api_version the way
 it already does for the Admin API version.
 
+### Testing principle — if a test supplies what production derives, something else must test the derivation · `RULE` 2026-09-03
+
+Three instances in this project, which is enough to stop treating it as bad luck.
+
+**C14, 2 Sep 2026.** `AdminApiOrderSource` read a line's `discountedTotalSet` and
+never its `discountAllocations`, so an order-level discount landed nowhere and a
+member earned on money they had not spent. The whole suite was green, because
+every fixture built an `OrderSnapshot` or a `lines` array **by hand** — each test
+started *after* the mapping and asserted arithmetic it had itself been fed. The
+payload-to-snapshot step was the only step no test exercised, and it was the step
+that was wrong.
+
+**The POS tile base URL, 3 Sep 2026.** `Modal.jsx` built its API client with
+`appUrl: shopify.environment?.appUrl ?? ''`. `shopify.environment` is not part of
+the POS surface, so this was always `''`, every till request went to a relative
+path that reaches nothing from the extension sandbox, and search silently
+returned no members for as long as the tile had existed. `tests/tile.test.js`
+constructs `TillApi` with `appUrl: 'https://app.example.com'` — so again, the one
+line that was wrong was the one line no test touched.
+
+**And in miniature, the same day.** `"a staff member with no app permission is a
+state, not a crash"` passed `appUrl: ''` as incidental scaffolding while its
+subject was the missing *token*. The moment `TillApi` learned to refuse an
+unusable base, that test stopped reaching its own subject. An arbitrary fixture
+value had been deciding what the test proved.
+
+**The rule.** *If a test supplies what production derives, something else must
+test the derivation.*
+
+Not "never supply a value" — the request-shaping tests in `tile.test.js` pass
+`appUrl` in deliberately and correctly, because their subject is headers,
+methods and payloads. They are simply not evidence about *where* a request goes,
+and nothing should read them as if they were.
+
+**How to apply.** Two questions when writing or reviewing a test:
+
+1. **What did I hand this code that it would normally work out for itself?**
+   That value is uncovered until something else covers it. `OrderSnapshot`,
+   `lines`, `appUrl` — each was a hand-supplied stand-in for a derivation.
+2. **Can the derivation even be called?** An inline expression at a construction
+   site cannot be reached by a test. Both fixes turned the derivation into a
+   named, importable unit before testing it — `AdminApiOrderSource::mapOrder()`
+   and `resolveAppUrl()`. Extracting the seam is part of the fix, not tidying
+   afterwards.
+
+**And prove the test would have failed.** The C14 mapping tests were verified by
+reintroducing the defect: 5 of 7 failed, on the exact 60000-against-55000
+figures. The base-URL test constructs `TillApi` with no `appUrl` at all and
+asserts `fetchImpl` was never called, which is the precise condition the device
+was in. A regression test nobody has seen fail is a hypothesis.
+
 ## 7. Change log
 
 | Date | Change |
@@ -1423,3 +1474,4 @@ it already does for the Admin API version.
 | 2026-09-03 | **The development store market configuration read directly, after `read_markets` was granted.** Three ACTIVE REGION markets (United Kingdom GBP, Canada CAD, United States USD); the UK market carries `inclusiveTaxPricingStrategy: INCLUDES_TAXES_IN_PRICE_BASED_ON_COUNTRY`, which is the £720 shown against a stored £600. **No primary market exists and that is not a fault** — 2026-07 `MarketType` has no `PRIMARY` value and `Market` has no `primary` or `enabled` field. The market configuration is correct, so **V12 is blocked solely by the locked US merchant address and the £135 rule and nothing in Markets can unblock it.** Ends two sessions of inferring this from `contextualPricing`. |
 | 2026-09-03 | **The POS tile search request never reaches the backend, and the route is not at fault.** Confirmed state (a): no line for `/api/admin/members` in the dev request log. The endpoint, params and auth are all correct - the extension sends `q` and `per_page`, `MemberController@index` defaults `field` to `all`, every param passes `MemberSearchRequest`, and all five identifiers find account 10. CORS is fine too: a live preflight from `extensions.shopifycdn.com` returns 204 with the right headers. The suspect is `Modal.jsx` line 43, `shopify.environment?.appUrl ?? ''` - **the 2026-07 POS UI extensions docs state that no API gives an extension its app URL**, and the worked example hardcodes it, so `appUrl` is almost certainly the empty string. A temporary modal-open diagnostic was committed to read the runtime and is to be reverted once read. **V15 raised** for the `@shopify/ui-extensions` version skew. |
 | 2026-09-03 | **POS Pro confirmed Active on both development-store locations, closing it as an open receivable.** "Shop location" (United States, the store default) and "My Custom Location" (123 Main St, Toronto, Canada). Two consequences: location attribution is now properly testable, so **step B2 of the dev-store script requires two DISTINCT `shopify_location_id` values from sales at the two locations** rather than merely non-NULL at one - a hardcoded default would pass the old check; and **neither location is in the UK and the US one is the default, corroborating V12** further. Location addresses deliberately left alone: fewer moving variables while the tile is being diagnosed, and V12 closes on the live store regardless. MD10 still targets one location for the production matrix. |
+| 2026-09-03 | **POS tile base URL fixed, and the pattern behind it written down as a rule.** `shopify.environment?.appUrl ?? ''` was always `''` - POS supplies no app URL at any version, confirmed against the 2026-07 docs - so every till request went to a relative path that reaches nothing from the extension sandbox. The URL is now compiled in via `resolveAppUrl()` in `extensions/loyalty-tile/src/lib/appUrl.js`, rewritten by `web/serve.mjs` at dev start from the tunnel handshake, so a tunnel change needs no manual edit and no extension redeploy. `TillApi` now refuses any base that is not an absolute https origin, returning `no_app_url` rather than issuing a relative fetch, and the tile says so. **Third instance of a test supplying what production derives** (after C14, plus one in miniature the same day), so it is recorded as a standing rule: *if a test supplies what production derives, something else must test the derivation.* Extension suite 53/53, backend 453/2057, Pint clean. |
