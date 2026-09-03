@@ -237,6 +237,15 @@ order `#1001` where the gift-card line came back with an empty
 
 ## B. POS populates `retailLocation`
 
+> **Nothing in section B has been passed yet, as of 3 Sep 2026.** An earlier run
+> reported all five searches finding the member; that was the results list
+> rendering on the deep-link preview surface, and nobody tapped a result. Tapping
+> was dead — every control in the modal was wired to `onPress`, which POS does
+> not emit (V19). So the query path is verified and **nothing else is**. Re-run
+> B from step 1, and treat tapping through to the member screen as something to
+> verify rather than assume.
+
+
 1. Open **Shopify POS on the iPad** (10th gen, POS app 11.11.1 — MD10), signed
    into the dev store, staff pinned.
 2. Add any product to the cart.
