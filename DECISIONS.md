@@ -856,7 +856,7 @@ none is silently assumed.
 | **V15** | **`@shopify/ui-extensions` installed at 2025.10.16 while the loyalty tile declares `api_version = "2026-07"`** - nothing pins the two together - found 3 Sep 2026 | `OUTSTANDING` - not blocking; resolve before trusting any conclusion drawn from those types | Sprint 3 tail |
 | **V16** | **Every till user needs a Privilege Club role and only the first staff member on a shop is bootstrapped** — an unassigned assistant gets `403 no_role_assigned` and the tile looks broken — found 3 Sep 2026 | `OUTSTANDING` — **BLOCKS GO-LIVE**; the implicit-viewer decision is parked next to C9 | Before production |
 | **V17** | **The tile discards the reason a request failed**, mapping every error but two to "That search could not be run." — raised 3 Sep 2026 | `OUTSTANDING` — small fix; third time in one day that a swallowed error cost time | Sprint 3 tail |
-| **V18** | **The TILL is a second denominator that V13 could not see** — a US-located till reports `USD` while the shop stays `GBP`, so GBP 50 of points would have discounted $50 and printed "£50.00" — found 3 Sep 2026 | **`RESOLVED` 3 Sep 2026** — till currency sent up and compared at `hold()`, failing closed | Sprint 3 |
+| **V18** | **The TILL is a second denominator that V13 could not see** — a US-located till reports `USD` while the shop stays `GBP`, so GBP 50 of points would have discounted $50 and printed "£50.00" — found 3 Sep 2026 | **guard `RESOLVED` 3 Sep 2026** — refusal path verified twice; **success path UNVERIFIED**, no GBP till exists here | Sprint 3 |
 | **V19** | **The tile listens for `onPress` and `onSubmit`, which POS components never emit** — nine buttons, the results list, the step controls and redeem are all inert — found 3 Sep 2026 | `OUTSTANDING` — **BLOCKS SPRINT 3**; steps 9-12 were never reachable | Sprint 3 |
 
 ### V1 — UI layer · `RESOLVED` 2026-08-26, **corrected 2026-08-27**
@@ -1595,7 +1595,7 @@ support, rather than testing `lib/` alone.
 given. This is the tile never asking. Both were invisible for the same underlying
 reason: a failure with no wording looks exactly like a feature that does nothing.
 
-### V18 — The till is a second denominator, and V13's guard could not see it · `RESOLVED` 2026-09-03
+### V18 — The till is a second denominator, and V13's guard could not see it · `GUARD RESOLVED, SUCCESS PATH UNVERIFIED` 2026-09-03
 
 Found and fixed 3 Sep 2026, from `cur=USD` on a live Android device.
 
@@ -1662,6 +1662,111 @@ line exists so that whoever makes it finds out here rather than from a customer.
 
 *Exposure before the fix.* Nil in production — OSC's tills are UK. Live on the
 development store, which is exactly where it was found.
+
+*What is proven and what is not — read this before quoting the status.* The
+**refusal path is verified twice**: by `TillCurrencyGuardTest` (8 tests, verified
+by removing the guard) and by a real refusal on an Android device at a USD till.
+The **success path is untested**: no GBP redemption has ever completed at a GBP
+till, because this store has no GBP till. **"V18 refuses correctly" is not POS
+redemption being verified.** See the artificiality entry and the live-store
+checklist below.
+
+### The development store is artificial, and what that does and does not invalidate · `RULE` 2026-09-03
+
+Stated by the client-side lead on 3 Sep 2026 and recorded because several
+findings read worse than they are without it, and one reads **better**.
+
+*The distinction.* The development store's merchant address is locked to the
+United States, its two POS locations are US and Canadian, and its market and
+currency configuration was never set up deliberately — the base currency was
+changed twice in one day by accident. **OSC's store is entirely UK**: UK address,
+GBP, UK market throughout. So V12 and V18 are **development-store artifacts, not
+client defects**. At OSC's store the till is GBP, the rules are GBP, both sides
+agree, and V18's guard simply passes.
+
+**This does not make either guard unnecessary.** A guard that never fires in
+production is doing its job; V13 fired for real on this store and minted a €50
+voucher for a GBP programme, which is what a misconfiguration looks like when
+nothing checks. The guards are cheap and the failure they prevent is silent.
+
+*What is proven, and it is worth being exact.* **V18's refusal path is verified
+two ways** — by test (`TillCurrencyGuardTest`, 8 tests, verified by removing the
+guard) and by refusal on a real device at a USD till. That is as far as this
+store can take it, and for the guard itself it is enough: the guard is correct.
+
+*What is NOT proven, and this must not be read as proven.* **The happy path.** A
+successful GBP redemption at a GBP till, and a correct earn base on a
+tax-inclusive order. Both sit behind the same wall, and neither has ever run.
+
+**So "V18 refuses correctly" is not POS redemption being verified.** The refusal
+path is verified; the success path is untested. Anyone reading the register
+should take that literally — a guard proven to say no is not a feature proven to
+say yes.
+
+*Whether a UK location on this store would fix it.* Split answer, because the two
+halves behave differently:
+
+- **Currency: genuine, not synthetic.** A location's till currency resolves
+  through the REGION market matching its address country, proven on 3 Sep 2026
+  by contextual pricing on one product: `GB -> 720.00 GBP`,
+  `CA -> 1080.00 CAD`, `US -> 824.00 USD`, each exactly its market's base
+  currency. The UK market is ACTIVE and GBP. So a UK-addressed location yields a
+  **real** GBP till, and **V18's success path can be genuinely closed here** —
+  the guard passing, the hold succeeding and `applyCartDiscount` denominating in
+  pounds would all be the real mechanism, not a stand-in.
+- **Tax: not genuine, and a pass would be misleading.** Tax treatment follows the
+  merchant's establishment and registration, not a location's address, and the
+  establishment is still US. So a VAT line appearing or not appearing at a UK
+  location says nothing about OSC.
+
+  **With one real exception.** V12's actual question is *platform arithmetic* —
+  does Shopify compute a line's `taxLines` before or after an order-level
+  discount allocation? That answer is a property of Shopify, not of whose store
+  asked. So **if** a discounted POS sale at a UK location does come back
+  `taxesIncluded: true` with a VAT line, the reconciliation is valid and V12 can
+  close on it. If it does not, that is not evidence of anything. Do not plan
+  around it.
+
+### Live-store verification checklist — what CANNOT be proven on the development store · `OPEN` 2026-09-03
+
+One list, because it now holds V12, V18's success path and POS redemption, and
+those were being tracked in three places. Anything here is untestable on the
+development store **by nature of the store**, not for want of trying.
+
+**A. Provable here first, if a UK location is added** (see the artificiality
+entry above — the currency half is genuine):
+
+| | What |
+| --- | --- |
+| A1 | **V18 success path** — a GBP till, the guard passing, a hold succeeding, `applyCartDiscount` denominating in pounds |
+| A2 | **Steps 9–12** of the dev-store script — `retailLocation` populated, two distinct location ids, the reference on the receipt, the offline state (C7) |
+| A3 | **The POS happy path end to end** — quote, hold, apply, paid order, `orders/paid`, confirm, points consumed, ledger entry keyed to the reference |
+
+If POS Pro cannot be assigned to a third location, all three move to section B,
+because POS Lite does not run POS UI extensions at all and there is no partial
+result available.
+
+**B. Live store only, and no dev-store configuration can change it:**
+
+| | What | Why it cannot move |
+| --- | --- | --- |
+| B1 | **V12 — earn base on a tax-inclusive order** | Needs a real VAT-inclusive discounted order. The merchant address is locked to the US and a non-UK merchant is not required to collect UK VAT above £135. Possible partial escape via A2, see the artificiality entry |
+| B2 | **V16 — a Privilege Club role for every till user** | Needs OSC's real staff accounts. Only the first staff member on a shop is bootstrapped; the rest 403 |
+| B3 | **V10 — the five reports reconciling with Shopify analytics** | Needs real order history at real volume |
+| B4 | **V9 — Klaviyo live wiring** | Needs OSC's private API key |
+| B5 | **C5 — live store currency and reporting timezone** | Is a fact about OSC's store, not a test |
+| B6 | **Migration reconciliation** | Needs the Dynamics/ORD export and real member records |
+| B7 | **`read_all_orders` historical backfill** | Needs two years of real orders |
+| B8 | **VAT-inclusive storefront and receipt presentation** | Follows merchant establishment, which is US here |
+| B9 | **The production application URL and its OAuth grant** | The dev tunnel is ephemeral by construction |
+
+**How to read this list.** Everything in B is a **gate**, not a risk: it is work
+that will be done once, on OSC's store, before launch. What matters is that
+nothing in B is quietly assumed to have been covered by a green dev-store run.
+The failure mode this list exists to prevent is a status report that reads
+greener than the evidence supports — which is exactly what happened on 3 Sep 2026
+when "all five searches return the member" was recorded before anyone had tapped
+a result.
 
 ## 7. Change log
 
@@ -1734,3 +1839,4 @@ development store, which is exactly where it was found.
 | 2026-09-03 | **CORRECTION to the earlier report that "all five searches return the member".** That overstates what happened and should not be read as search having worked. What was observed was the **results list rendering** on the deep-link preview surface. Nobody ever tapped a result — and tapping was dead, because `s-clickable` was wired to `onPress` (V19). So the observation evidenced the **query path only**: that `MemberSearch` with `field=all` finds account 10 by club card, email, surname, postcode and legacy card, which was separately verified by running the query directly against the database. It is not evidence that the tile could search, that a member could be selected, or that anything downstream of selection worked. **Step B was never passed and must be re-run in full**, with tapping through to the member screen verified rather than assumed. |
 | 2026-09-03 | **V19 fixed, and the fourth instance of the coverage pattern recorded.** Nine `onPress` handlers renamed to `onClick`, and the search field's unreachable `onSubmit` replaced with a visible Search button — a rename alone would have left a till user typing a name with nothing to press. `tests/handlerContract.test.js` now derives an allowlist from the installed `@shopify/ui-extensions` type declarations and checks every `<s-tag onX=` pair in the JSX against it; verified by reintroducing the defect, which fails four tests and names `<s-button onPress=` in the output. The `tile.test.js` docblock is rewritten as a warning: **"tested without rendering POS" was a reasonable trade-off that became the reason a broken tile shipped.** The rule entry is updated to four instances and generalised — the pattern is not only a test supplying a derived value, it is a test standing where the defect cannot be seen from. Extension suite 73/73, backend 453/2057, Pint clean. |
 | 2026-09-03 | **V18 raised and fixed: the till is a second denominator, and V13 could not see it.** V13 compares the shop currency with the rules currency; both are GBP for OSC, so it passes — while a POS sale is transacted in the currency of its LOCATION. `cur=USD` from a live device proved it: 1000 points priced at £50 would have discounted **$50** and printed "£50.00" on the receipt, because `applyCartDiscount` passes a bare number and `session.currency` was never referenced anywhere in the tile. Now sent up as `till_currency` and compared at `hold()` for the POS channel only, **failing closed** — which broke eight existing POS tests, every one of which had been holding at a till without stating its currency. Verified by removing the guard (4 of 8 new tests fail). The hardcoded `£` in `discountTitle()` and `formatPence()` is now correct by construction rather than by check, and is recorded rather than fixed. Backend 461/2078, extension 73/73, Pint clean. |
+| 2026-09-03 | **Recorded that the development store is artificial, and split V18 into a proven guard and an unproven happy path.** OSC's store is entirely UK — UK address, GBP, UK market — so V12 and V18 are **dev-store artifacts, not client defects**; at OSC the till and the rules both read GBP and V18 simply passes. That does not make the guards unnecessary: V13 fired for real here and minted a €50 voucher for a GBP programme. **V18's refusal path is verified twice** (8 tests, verified by removing the guard; plus a real refusal on device at a USD till); its **success path is untested** and must not be read as verified. A UK location would make the currency half **genuine** — till currency resolves through the REGION market matching the location country, proven by `GB->720.00 GBP`, `CA->1080.00 CAD`, `US->824.00 USD` — but the tax half would be misleading, since tax follows merchant establishment. **A consolidated live-store verification checklist is now the single home** for V12, V18's success path, POS redemption, V16, V10, V9, C5, migration and the backfill. |
