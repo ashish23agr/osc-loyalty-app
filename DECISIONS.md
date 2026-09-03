@@ -856,6 +856,7 @@ none is silently assumed.
 | **V15** | **`@shopify/ui-extensions` installed at 2025.10.16 while the loyalty tile declares `api_version = "2026-07"`** - nothing pins the two together - found 3 Sep 2026 | `OUTSTANDING` - not blocking; resolve before trusting any conclusion drawn from those types | Sprint 3 tail |
 | **V16** | **Every till user needs a Privilege Club role and only the first staff member on a shop is bootstrapped** — an unassigned assistant gets `403 no_role_assigned` and the tile looks broken — found 3 Sep 2026 | `OUTSTANDING` — **BLOCKS GO-LIVE**; the implicit-viewer decision is parked next to C9 | Before production |
 | **V17** | **The tile discards the reason a request failed**, mapping every error but two to "That search could not be run." — raised 3 Sep 2026 | `OUTSTANDING` — small fix; third time in one day that a swallowed error cost time | Sprint 3 tail |
+| **V18** | **The TILL is a second denominator that V13 could not see** — a US-located till reports `USD` while the shop stays `GBP`, so GBP 50 of points would have discounted $50 and printed "£50.00" — found 3 Sep 2026 | **`RESOLVED` 3 Sep 2026** — till currency sent up and compared at `hold()`, failing closed | Sprint 3 |
 | **V19** | **The tile listens for `onPress` and `onSubmit`, which POS components never emit** — nine buttons, the results list, the step controls and redeem are all inert — found 3 Sep 2026 | `OUTSTANDING` — **BLOCKS SPRINT 3**; steps 9-12 were never reachable | Sprint 3 |
 
 ### V1 — UI layer · `RESOLVED` 2026-08-26, **corrected 2026-08-27**
@@ -1594,6 +1595,63 @@ support, rather than testing `lib/` alone.
 given. This is the tile never asking. Both were invisible for the same underlying
 reason: a failure with no wording looks exactly like a feature that does nothing.
 
+### V18 — The till is a second denominator, and V13's guard could not see it · `RESOLVED` 2026-09-03
+
+Found and fixed 3 Sep 2026, from `cur=USD` on a live Android device.
+
+*Why V13 was not enough.* V13 made `hold()` compare the **shop** currency with
+the rules currency. For OSC both are GBP, so that comparison passes — and a POS
+sale is transacted in the currency of its **location**, which the comparison
+never looks at. On the development store, "Shop location" is in the United
+States and its session reports `USD` while `shop { currencyCode }` stays `GBP`.
+Two different denominators, and V13 only knew about one.
+
+*What would have happened.* `shopify.cart.applyCartDiscount('FixedAmount', title,
+'50.00')` passes a **bare number** and lets the till denominate it, exactly as
+`discountCodeBasicCreate` lets the shop denominate. So 1000 points priced at
+£50 would have discounted **$50**, while `formatPence` printed **"£50.00"** in
+the receipt title. Wrong money, and a receipt contradicting the sale it is
+printed on. `session.currency` — which POS does provide, and which the `Session`
+type has carried all along — was **never referenced anywhere in the tile**.
+
+*The fix.* The till currency is sent up rather than assumed:
+`Modal.jsx` reads `session.currency`, `TillApi.hold()` sends `till_currency`,
+`RedemptionController` validates it as a three-letter code, and `hold()` compares
+it with `RuleSet::currency()` **for the POS channel only** — there is no till in
+an online checkout and requiring one there would refuse every web redemption.
+`TILL_CURRENCY_MISMATCH` and `TILL_CURRENCY_UNKNOWN` are separate reasons, and
+the tile gives both wording that ends with *continue the sale*.
+
+**It fails closed.** A POS hold that does not state a currency is refused, not
+trusted: an unverifiable POS redemption is precisely what this guard exists to
+stop, and nothing in production has ever held one, so there was no compatibility
+to preserve.
+
+*What that cost, and why it was worth it.* Failing closed broke **eight existing
+POS tests**. Every one of them was holding at a till without stating what
+currency the till was in — so the breakage was the guard doing its job on the
+suite before it ever saw a shop. Each now states it. Two in `CurrencyGuardTest`
+needed it specifically so they keep reaching their own subject rather than being
+refused earlier for a different reason; that is the same incidental-fixture trap
+as the `appUrl: ''` one, and it is noted at the site.
+
+*Verified by removing the guard*, which fails 4 of the 8 new tests in
+`TillCurrencyGuardTest` — including one that asserts explicitly that V13's
+comparison is satisfied while V18's is not, so the gap between them is a test
+rather than a paragraph.
+
+*What this does NOT fix, deliberately.* The hardcoded `£` in
+`PosCartDiscountGateway::discountTitle()` and in the tile's `formatPence()`. Both
+are now correct **by construction** rather than by check: a till whose currency
+disagrees with the rules cannot hold a redemption at all, so nothing reaches
+those strings in the wrong money. If OSC ever runs a non-GBP programme they
+become wrong again, and the guard will not catch it because both sides would
+agree. Recorded rather than fixed, because inventing multi-currency formatting
+for a single-currency programme is scope nobody asked for.
+
+*Exposure before the fix.* Nil in production — OSC's tills are UK. Live on the
+development store, which is exactly where it was found.
+
 ## 7. Change log
 
 | Date | Change |
@@ -1664,3 +1722,4 @@ reason: a failure with no wording looks exactly like a feature that does nothing
 | 2026-09-03 | **V19: the POS tile listens for events its components never emit, so almost nothing in it works.** Member search doing nothing on Android POS was the first symptom, not the defect. `Modal.jsx` wires 9 controls to `onPress` and the search field to `onSubmit`; POS emits neither, and Preact attaches a listener for the literal event name, so they fail silently. `onPress` appears in **zero files** in `@shopify/ui-extensions`; `Clickable` and `Button` expose `onClick`, `SearchField` exposes `onInput`/`onChange`/`onBlur`/`onFocus`. **The device settled it independently of the types**, which matters while V15 is open: `Tile.jsx` uses `onClick` and the tile opens, `onInput` fires and the hints update, `onPress`/`onSubmit` do nothing. **Steps 9-12 were never reachable** — selecting a member, the step controls, redeem, enrol and cancel are all inert. No test caught it because `tile.test.js` tests "without rendering POS" and never imports the JSX: **fourth instance** of the untested-wiring pattern recorded as a rule this morning. |
 | 2026-09-03 | **CORRECTION to the earlier report that "all five searches return the member".** That overstates what happened and should not be read as search having worked. What was observed was the **results list rendering** on the deep-link preview surface. Nobody ever tapped a result — and tapping was dead, because `s-clickable` was wired to `onPress` (V19). So the observation evidenced the **query path only**: that `MemberSearch` with `field=all` finds account 10 by club card, email, surname, postcode and legacy card, which was separately verified by running the query directly against the database. It is not evidence that the tile could search, that a member could be selected, or that anything downstream of selection worked. **Step B was never passed and must be re-run in full**, with tapping through to the member screen verified rather than assumed. |
 | 2026-09-03 | **V19 fixed, and the fourth instance of the coverage pattern recorded.** Nine `onPress` handlers renamed to `onClick`, and the search field's unreachable `onSubmit` replaced with a visible Search button — a rename alone would have left a till user typing a name with nothing to press. `tests/handlerContract.test.js` now derives an allowlist from the installed `@shopify/ui-extensions` type declarations and checks every `<s-tag onX=` pair in the JSX against it; verified by reintroducing the defect, which fails four tests and names `<s-button onPress=` in the output. The `tile.test.js` docblock is rewritten as a warning: **"tested without rendering POS" was a reasonable trade-off that became the reason a broken tile shipped.** The rule entry is updated to four instances and generalised — the pattern is not only a test supplying a derived value, it is a test standing where the defect cannot be seen from. Extension suite 73/73, backend 453/2057, Pint clean. |
+| 2026-09-03 | **V18 raised and fixed: the till is a second denominator, and V13 could not see it.** V13 compares the shop currency with the rules currency; both are GBP for OSC, so it passes — while a POS sale is transacted in the currency of its LOCATION. `cur=USD` from a live device proved it: 1000 points priced at £50 would have discounted **$50** and printed "£50.00" on the receipt, because `applyCartDiscount` passes a bare number and `session.currency` was never referenced anywhere in the tile. Now sent up as `till_currency` and compared at `hold()` for the POS channel only, **failing closed** — which broke eight existing POS tests, every one of which had been holding at a till without stating its currency. Verified by removing the guard (4 of 8 new tests fail). The hardcoded `£` in `discountTitle()` and `formatPence()` is now correct by construction rather than by check, and is recorded rather than fixed. Backend 461/2078, extension 73/73, Pint clean. |
