@@ -75,21 +75,10 @@ function Extension() {
     console.log('[oxford-diag] constructed search URL =', url);
 
     // On-device fallback: console output may not surface on POS for Android,
-    // and a rebuild that yields nothing readable is a wasted round trip. So the
-    // facts that decide the open questions go somewhere guaranteed visible.
-    //
-    // Order matters. A toast truncates, and `userId` is the number that settles
-    // whether the cart surface presents a different staff identity from the one
-    // holding the agent role, so it goes first. `locationId` is step B2's
-    // subject and `currency` is V18's, both free to carry here. The URL stays
-    // last: it only needs to confirm the appUrl fix, and an empty base shows as
-    // a leading slash with no host.
-    const s = shopify.session?.currentSession ?? {};
-
-    shopify.toast?.show?.(
-      `diag: user=${s.userId ?? '?'} loc=${s.locationId ?? '?'} cur=${s.currency ?? '?'} | ${url || '(empty)'}`,
-      {duration: 15000},
-    );
+    // and a rebuild that yields nothing readable is a wasted round trip. The
+    // URL is the one line that decides this, so it goes somewhere guaranteed
+    // visible. `appUrl` empty shows as a leading slash with no host.
+    shopify.toast?.show?.(`diag: ${url || '(empty)'}`, {duration: 10000});
   }, [api]);
 
   useEffect(() => {
