@@ -114,7 +114,7 @@ export class TillApi {
   }
 
   /** Hold the quote the assistant chose, attributed to the staff member. */
-  hold({memberId, eligibleSubtotalPence, basketTotalPence, requestedPence, locationId, staffMemberId}) {
+  hold({memberId, eligibleSubtotalPence, basketTotalPence, requestedPence, locationId, staffMemberId, tillCurrency}) {
     return this.request('/redemptions', {
       method: 'POST',
       body: {
@@ -125,6 +125,10 @@ export class TillApi {
         requested_pence: requestedPence,
         shopify_location_id: locationId,
         staff_member_id: staffMemberId,
+        // V18: the till denominates the discount, not the shop. Sent so the
+        // server can refuse rather than silently apply GBP 50 of points as
+        // USD 50 at a US-located till.
+        till_currency: tillCurrency,
       },
     });
   }

@@ -61,6 +61,33 @@ final class RedemptionService
      */
     public const CURRENCY_UNKNOWN = 'currency_unknown';
 
+    /**
+     * The TILL is denominated in a different currency from the programme (V18).
+     *
+     * A different comparison from CURRENCY_MISMATCH, and the reason that one was
+     * not enough. `ShopCurrency` answers "what is the shop denominated in?",
+     * which for OSC is GBP and matches the rules. A POS sale is transacted in the
+     * currency of its LOCATION: on the development store, "Shop location" is in
+     * the United States and its till reports `USD`, while the shop stays GBP.
+     *
+     * `applyCartDiscount` takes a bare number and denominates it in the till's
+     * currency, exactly as `discountCodeBasicCreate` denominates in the shop's.
+     * So 1000 points priced at GBP 50 would have discounted USD 50 and printed
+     * "£50.00" on the receipt - wrong money, and a receipt contradicting the
+     * sale. Found 3 Sep 2026 from `cur=USD` on a live device.
+     */
+    public const TILL_CURRENCY_MISMATCH = 'till_currency_mismatch';
+
+    /**
+     * A POS hold arrived without saying what currency the till is in.
+     *
+     * Fails closed. An older tile build that does not send it cannot be verified,
+     * and an unverifiable POS redemption is the thing V18 exists to stop - so it
+     * is refused rather than trusted. Nothing in production has ever held a POS
+     * redemption, so there is no compatibility to preserve.
+     */
+    public const TILL_CURRENCY_UNKNOWN = 'till_currency_unknown';
+
     public function __construct(
         private readonly LedgerService $ledger,
         private readonly BalanceCalculator $balances,
@@ -118,6 +145,7 @@ final class RedemptionService
         ?int $requestedPence = null,
         ?int $shopifyLocationId = null,
         ?string $staffReference = null,
+        ?string $tillCurrency = null,
     ): array {
         if ($account->isMerged()) {
             throw new RuntimeException('Account '.$account->id.' was merged; quote the survivor instead.');
@@ -155,8 +183,47 @@ final class RedemptionService
         // Before the transaction on purpose: a refusal must leave no row. A
         // quote in `quoted` state with no offer behind it is the orphan the
         // expiry sweep then has to reason about, for no gain.
-        $shopCurrency = $this->shopCurrency->for($account->shop_domain);
         $rulesCurrency = $rules->currency();
+
+        // V18. The till is a second denominator, and the shop check above cannot
+        // see it: OSC's shop is GBP and its rules are GBP, so that comparison
+        // passes while a US-located till still transacts in USD. Only the POS
+        // channel has a till, so only POS is asked.
+        if ($channel === 'pos') {
+            if ($tillCurrency === null || $tillCurrency === '') {
+                Log::error('Refusing a POS hold: the till did not say what currency it is in', [
+                    'shop' => $account->shop_domain,
+                    'account' => $account->id,
+                    'rules_currency' => $rulesCurrency,
+                    'location' => $shopifyLocationId,
+                ]);
+
+                return [
+                    'redemption' => null,
+                    'quote' => $quote,
+                    'reason' => self::TILL_CURRENCY_UNKNOWN,
+                ];
+            }
+
+            if (strcasecmp($tillCurrency, $rulesCurrency) !== 0) {
+                Log::error('Refusing a POS hold: the till and the programme disagree about currency', [
+                    'shop' => $account->shop_domain,
+                    'account' => $account->id,
+                    'till_currency' => $tillCurrency,
+                    'rules_currency' => $rulesCurrency,
+                    'amount_pence' => $amount,
+                    'location' => $shopifyLocationId,
+                ]);
+
+                return [
+                    'redemption' => null,
+                    'quote' => $quote,
+                    'reason' => self::TILL_CURRENCY_MISMATCH,
+                ];
+            }
+        }
+
+        $shopCurrency = $this->shopCurrency->for($account->shop_domain);
 
         if ($shopCurrency === null || strcasecmp($shopCurrency, $rulesCurrency) !== 0) {
             $unknown = $shopCurrency === null;

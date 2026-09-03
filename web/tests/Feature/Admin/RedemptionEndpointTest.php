@@ -145,6 +145,9 @@ class RedemptionEndpointTest extends AdminApiTestCase
             'eligible_subtotal_pence' => 6000,
             'basket_total_pence' => 10000,
             'channel' => 'pos',
+            // V18: a POS hold must state the till's currency; an unverifiable
+            // one is refused. GBP here means the till agrees with the rules.
+            'till_currency' => 'GBP',
             'shopify_location_id' => 771,
             'staff_member_id' => 4242,
         ], $this->headersFor('agent', 810002))
@@ -179,6 +182,9 @@ class RedemptionEndpointTest extends AdminApiTestCase
             'eligible_subtotal_pence' => 6000,
             'basket_total_pence' => 10000,
             'channel' => 'pos',
+            // V18: a POS hold must state the till's currency; an unverifiable
+            // one is refused. GBP here means the till agrees with the rules.
+            'till_currency' => 'GBP',
         ], $this->headersFor('agent', 810002))->assertStatus(201);
 
         $this->assertSame([], $this->metafields->written);
@@ -244,6 +250,9 @@ class RedemptionEndpointTest extends AdminApiTestCase
             'eligible_subtotal_pence' => 6000,
             'basket_total_pence' => 10000,
             'channel' => 'pos',
+            // V18: a POS hold must state the till's currency; an unverifiable
+            // one is refused. GBP here means the till agrees with the rules.
+            'till_currency' => 'GBP',
         ], $this->headersFor('agent', 810002))
             ->assertOk()
             ->assertJsonPath('redemption', null)
@@ -262,6 +271,9 @@ class RedemptionEndpointTest extends AdminApiTestCase
             'eligible_subtotal_pence' => 6000,
             'basket_total_pence' => 10000,
             'channel' => 'pos',
+            // V18: a POS hold must state the till's currency; an unverifiable
+            // one is refused. GBP here means the till agrees with the rules.
+            'till_currency' => 'GBP',
             'requested_pence' => 1500,
         ], $this->headersFor('agent', 810002))
             ->assertStatus(201)
@@ -278,6 +290,9 @@ class RedemptionEndpointTest extends AdminApiTestCase
             'eligible_subtotal_pence' => 6000,
             'basket_total_pence' => 10000,
             'channel' => 'pos',
+            // V18: a POS hold must state the till's currency; an unverifiable
+            // one is refused. GBP here means the till agrees with the rules.
+            'till_currency' => 'GBP',
         ], $this->headersFor('viewer', 810003))->assertStatus(403);
 
         $this->assertSame(0, Redemption::query()->count());
@@ -287,6 +302,9 @@ class RedemptionEndpointTest extends AdminApiTestCase
             'eligible_subtotal_pence' => 6000,
             'basket_total_pence' => 10000,
             'channel' => 'pos',
+            // V18: a POS hold must state the till's currency; an unverifiable
+            // one is refused. GBP here means the till agrees with the rules.
+            'till_currency' => 'GBP',
             'staff_member_id' => 4242,
         ], $this->headersFor('agent', 810002))->assertStatus(201);
 

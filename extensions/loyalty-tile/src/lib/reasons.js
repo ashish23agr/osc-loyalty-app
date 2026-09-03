@@ -83,6 +83,14 @@ const MESSAGES = {
     title: 'No permission to use Privilege Club',
     detail: 'This POS user is not permitted to use the app. Continue the sale, and ask an administrator.',
   },
+  till_currency_mismatch: {
+    title: 'This till is in the wrong currency',
+    detail: 'Privilege Club vouchers are in pounds and this till takes another currency. Continue the sale without a voucher, and report it.',
+  },
+  till_currency_unknown: {
+    title: 'The till did not report its currency',
+    detail: 'A voucher cannot be applied safely without it. Continue the sale, and report it.',
+  },
   no_app_url: {
     title: 'Loyalty is not configured for this device',
     detail: 'Continue the sale and report it — the app has no address to call.',

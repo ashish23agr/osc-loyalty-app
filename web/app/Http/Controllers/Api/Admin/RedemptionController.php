@@ -68,6 +68,11 @@ class RedemptionController extends AdminController
             // The pinned staff member at the till, which may differ from the
             // authenticated user the token identifies.
             'staff_member_id' => ['nullable', 'integer'],
+            // V18: what the TILL is denominated in, which is the currency of its
+            // location and not necessarily the shop's. Required for POS, because
+            // a POS hold that cannot state it cannot be verified - see
+            // RedemptionService::TILL_CURRENCY_UNKNOWN.
+            'till_currency' => ['nullable', 'string', 'size:3'],
         ]);
 
         $member = $this->member($request, (string) $validated['loyalty_account_id']);
@@ -85,6 +90,7 @@ class RedemptionController extends AdminController
             // actually standing at the till; the token's user is who authorised
             // the app. Both matter, and they are not always the same person.
             staffReference: self::staffReference($staff, $validated['staff_member_id'] ?? null),
+            tillCurrency: $validated['till_currency'] ?? null,
         );
 
         if ($held['redemption'] === null) {

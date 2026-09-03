@@ -78,6 +78,9 @@ class QuoteExpiryTest extends TestCase
             eligibleSubtotalPence: 6000,
             basketTotalPence: 10000,
             channel: $channel,
+            // V18: a POS hold is refused unless the till states its currency.
+            // Only meaningful on the POS branch; harmless on the online one.
+            tillCurrency: 'GBP',
         )['redemption'];
     }
 

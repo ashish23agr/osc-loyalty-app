@@ -365,6 +365,9 @@ function MemberView({api, member, session, onBack}) {
       // C9/M7: who is actually at the till, which POS reports separately from
       // the signed-in user.
       staffMemberId: session.staffMemberId ?? session.userId ?? null,
+      // V18: POS reports the till's currency on the session, and it is the
+      // currency the discount is actually denominated in.
+      tillCurrency: session.currency ?? null,
     });
 
     setBusy(false);

@@ -373,6 +373,7 @@ class RedemptionTest extends TestCase
 
         $held = $this->redemptions->hold(
             $member->refresh(), $this->gateway, 6000, 10000, 'pos',
+            tillCurrency: 'GBP',
         );
 
         $this->assertNotNull($held['redemption'], 'The quote still stands at the till.');

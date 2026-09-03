@@ -93,6 +93,11 @@ class CurrencyGuardTest extends TestCase
             eligibleSubtotalPence: 6000,
             basketTotalPence: 10000,
             channel: $channel,
+            // V18 is checked before this file's subject, so a POS hold with no
+            // till currency would be refused for the WRONG reason and these
+            // tests would stop reaching the shop-versus-rules comparison they
+            // are about. Stated so they do. See TillCurrencyGuardTest.
+            tillCurrency: 'GBP',
         );
     }
 
