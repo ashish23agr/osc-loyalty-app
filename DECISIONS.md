@@ -1733,6 +1733,24 @@ One list, because it now holds V12, V18's success path and POS redemption, and
 those were being tracked in three places. Anything here is untestable on the
 development store **by nature of the store**, not for want of trying.
 
+**TOMORROW'S FIRST DECISION POINT (4 Sep 2026), and everything in section A
+hangs on it.** Can POS Pro be assigned to a **third**, UK-addressed location? An
+admin and billing question, not a code one, and being answered by the
+client-side lead directly.
+
+- **If POS Pro assigns and the tile reports `cur=GBP`** — A1, A2 and A3 become
+  provable on this store, and the POS happy path closes here.
+- **If it does not** — POS redemption **joins section B** and closes only on
+  OSC's store. POS Lite does not run POS UI extensions at all, so there is no
+  partial result to salvage and no reason to pursue it further here.
+
+Either way there is an inventory prerequisite: `The Collection Snowboard:
+Hydrogen` is inventory-tracked with 48 units at the existing locations, so a new
+location starts at zero and POS will not add a tracked, zero-stock item to a
+cart. Move a few units across, or test with `The Inventory Not Tracked
+Snowboard` (£949.95, untracked) and expect every figure in the run-sheet to
+differ from what is recorded.
+
 **A. Provable here first, if a UK location is added** (see the artificiality
 entry above — the currency half is genuine):
 
