@@ -68,17 +68,9 @@ function Extension() {
       }
     };
 
-    const url = `${api.appUrl}/api/admin/members?q=TEST&per_page=10`;
-
     console.log('[oxford-diag] shopify.environment =', safe(shopify.environment));
     console.log('[oxford-diag] shopify.session.currentSession =', safe(shopify.session?.currentSession));
-    console.log('[oxford-diag] constructed search URL =', url);
-
-    // On-device fallback: console output may not surface on POS for Android,
-    // and a rebuild that yields nothing readable is a wasted round trip. The
-    // URL is the one line that decides this, so it goes somewhere guaranteed
-    // visible. `appUrl` empty shows as a leading slash with no host.
-    shopify.toast?.show?.(`diag: ${url || '(empty)'}`, {duration: 10000});
+    console.log('[oxford-diag] constructed search URL =', `${api.appUrl}/api/admin/members?q=TEST&per_page=10`);
   }, [api]);
 
   useEffect(() => {
