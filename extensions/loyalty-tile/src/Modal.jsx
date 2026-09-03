@@ -3,6 +3,7 @@ import {render} from 'preact';
 import {useCallback, useEffect, useMemo, useState} from 'preact/hooks';
 
 import {TillApi} from './lib/api.js';
+import {resolveAppUrl} from './lib/appUrl.js';
 import {enrolmentProblem, toPayload, validate} from './lib/enrolment.js';
 import {canScan, fromScan, hintFor} from './lib/lookup.js';
 import {formatPence, stepDown, stepUp} from './lib/money.js';
@@ -40,7 +41,10 @@ function Extension() {
   const api = useMemo(
     () => new TillApi({
       getSessionToken: () => shopify.session.getSessionToken(),
-      appUrl: shopify.environment?.appUrl ?? '',
+      // POS supplies no app URL of its own (2026-07). resolveAppUrl consults
+      // the host anyway, in case a later version does, and falls back to the
+      // compiled constant. It never returns ''.
+      appUrl: resolveAppUrl(shopify),
     }),
     [],
   );
@@ -184,7 +188,12 @@ function Lookup({api, onFound, onEnrol}) {
       setProblem(
         response.error === 'unreachable'
           ? 'The loyalty system could not be reached. Continue the sale.'
-          : 'That search could not be run.',
+          // A misconfigured build rather than anything the assistant did, and
+          // worth saying so: this exact state ran silently for a day because it
+          // was indistinguishable from "no members found".
+          : response.error === 'no_app_url'
+            ? 'Loyalty is not configured for this device. Continue the sale and report it.'
+            : 'That search could not be run.',
       );
 
       return;

@@ -134,8 +134,56 @@ function clearHandshake() {
   }
 }
 
+// POS gives an extension no way to discover its own app URL (confirmed against
+// the 2026-07 docs: no settings API, no relative resolution, no proxy), and UI
+// extension builds have no environment-variable support - `process.env` works in
+// dev and then throws "process is not defined" on the deployed version. So the
+// tile compiles the URL in as a constant, and the one place that already knows
+// the current tunnel is this file. Rewriting the constant here means a tunnel
+// change needs no manual edit and no extension redeploy: the CLI rebuilds the
+// extension on file change and POS picks it up when the tile is reopened.
+//
+// Only the value inside the quotes is touched, and only when it differs, so this
+// does not churn the file on every dev start.
+function writeExtensionAppUrl() {
+  if (!tunnel.startsWith('https://')) {
+    return;
+  }
+
+  const path = join(here, '..', 'extensions', 'loyalty-tile', 'src', 'lib', 'appUrl.js');
+  const host = tunnel.replace(/\/+$/, '');
+
+  let source;
+
+  try {
+    source = readFileSync(path, 'utf8');
+  } catch {
+    console.warn('[oxford-staging] No extensions/loyalty-tile/src/lib/appUrl.js; the POS tile will use whatever is compiled in.');
+
+    return;
+  }
+
+  const pattern = /^(export const APP_URL = ')([^']*)(';)$/m;
+  const match = source.match(pattern);
+
+  if (!match) {
+    console.warn('[oxford-staging] Could not find the APP_URL constant in appUrl.js; leaving it alone.');
+
+    return;
+  }
+
+  if (match[2] === host) {
+    return;
+  }
+
+  writeFileSync(path, source.replace(pattern, `$1${host}$3`), 'utf8');
+  console.log(`[oxford-staging] POS tile APP_URL -> ${host}`);
+  console.log('[oxford-staging] Reopen the Privilege Club tile on the device to pick it up.');
+}
+
 writeHandshake();
 checkScopes();
+writeExtensionAppUrl();
 
 console.log(`[oxford-staging] Laravel backend -> http://${host}:${port}`);
 

@@ -1578,6 +1578,7 @@ moment they are late.
 - [ ] Full scope set in TOML and config together, re-authorisation performed
 - [ ] `read_all_orders` application submitted
 - [ ] Real, stable HTTPS `application_url` before any deploy
+- [ ] **`APP_URL` in `extensions/loyalty-tile/src/lib/appUrl.js` set to the production URL** — POS gives an extension no way to discover its own app URL (2026-07), so the tile compiles it in. `web/serve.mjs` rewrites it to the tunnel on every `shopify app dev` start, so whatever is committed at release time is what ships to every till. Same requirement, and the same trap, as `application_url` in `shopify.app.toml`
 - [ ] App released, superseding the two unreleased spike versions
 - [ ] Extension API versions aligned, unused function target removed (V8)
 - [x] Webhook placement settled — Admin API only, nothing in the TOML
