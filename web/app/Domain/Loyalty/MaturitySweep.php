@@ -34,6 +34,7 @@ final class MaturitySweep
         private readonly LedgerService $ledger,
         private readonly BalanceCalculator $balances,
         private readonly MemberEvents $events,
+        private readonly VoucherCrossing $crossings,
     ) {}
 
     /**
@@ -103,10 +104,11 @@ final class MaturitySweep
     /**
      * Tell Klaviyo what the member would want to know (M11, Sprint 4).
      *
-     * Two events, and only the second is conditional: points becoming available
-     * always matters, but "you have another five pounds" is only true when the
-     * balance actually crossed an increment. Firing that one on every maturity
-     * would promise a voucher that is not there.
+     * Two events. Points becoming available always matters and is announced
+     * here, because it is specific to maturity. The crossing is not: it is
+     * delegated to VoucherCrossing, which every path that moves available
+     * points shares, so "you have another five pounds" means the same thing
+     * and carries the same shape whatever caused it.
      */
     private function announce(LoyaltyAccount $account, Balances $before, int $matured): void
     {
@@ -118,14 +120,10 @@ final class MaturitySweep
             'voucher_balance_pence' => $after->voucher->pence(),
         ]);
 
-        if ($after->voucher->increments > $before->voucher->increments) {
-            $this->events->emit($account, LoyaltyEventName::VOUCHER_INCREMENT_REACHED, [
-                'increments' => $after->voucher->increments,
-                'increments_gained' => $after->voucher->increments - $before->voucher->increments,
-                'voucher_balance_pence' => $after->voucher->pence(),
-                'points_to_next_increment' => $after->voucher->pointsToNextIncrement,
-            ]);
-        }
+        // The crossing rule is VoucherCrossing's, not this sweep's: maturity is
+        // one of several ways points reach the available bucket, and while the
+        // rule lived here it was the only one that announced (V20).
+        $this->crossings->announce($account, $before, $after);
     }
 
     /**

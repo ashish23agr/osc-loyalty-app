@@ -1302,9 +1302,12 @@ implementation and no verification story.**
 
 | Module | Status | Evidence, or what is missing |
 | --- | --- | --- |
-| Ledger, earning, refunds, reversals, maturity, expiry, segmentation | **BUILT AND VERIFIED** | 461 backend tests / 2,078 assertions. C14 fixed and proven by replay against real order `#1002`; `loyalty:verify-ledger` reconciles every cached balance |
+| Ledger, earning, refunds, reversals, maturity, expiry, segmentation | **BUILT AND VERIFIED** | 464 backend tests / 2,088 assertions. C14 fixed and proven by replay against real order `#1002`; `loyalty:verify-ledger` reconciles every cached balance |
+| Voucher engine — the **derived** balance (M4) | **BUILT AND VERIFIED** | `BalanceCalculator::derive()` covers all four boundary cases the plan names (99, 100, 199, 200) plus a negative floor and rule-version independence. Not unit tests alone: the same derivation ran through a real checkout on 2 Sep and rendered "£150 of voucher value" on a real till on 3 Sep |
+| Voucher engine — the **issued reward** (M4) | **NOT BUILT beyond issuance** — [V21, parked pending a briefing] | **The reward lifecycle is a missing state machine, not a missing screen.** `loyalty_rewards` models five states and only `issued` is reachable; `state` is currently decoration. No `RewardStateMachine`, no `ExpireRewardsJob`, no goodwill/cancel/reissue route, and the till cannot redeem an issued reward. Birthday issuance alone exists, and has issued nothing here |
+| Customer balance metafields (M4, V4) | **NOT BUILT** | No `PublishBalanceMetafieldJob`. The writer exists but publishes only a per-redemption quote; `member_status` and `segment` are never published as metafields at all. V4 unvalidated |
 | Online redemption — single-use discount code | **BUILT AND VERIFIED** | Dev-store script A1–A4 passed 2 Sep 2026: code minted, applied at a real checkout, `state=confirmed`, `points_consumed=1000`, unused quote swept to `void`. The only path fully exercised against a real shop |
-| Admin console | **BUILT, PARTIALLY** | Six real screens — Dashboard, Customers, Member profile, Loyalty, Audit, Settings — and 134 frontend tests. **Three screens are still placeholders: Vouchers, Transactions, Reports** |
+| Admin console | **BUILT, PARTIALLY** | Six real screens — Dashboard, Customers, Member profile, Loyalty, Audit, Settings — and 134 frontend tests. **Three screens are still placeholders: Vouchers, Transactions, Reports.** Read the Vouchers placeholder narrowly: what is missing behind it is the reward state machine (V21), not the screen |
 | POS tile | **BUILT, PARTIALLY VERIFIED** | Steps 1–5 pass 3 Sep 2026: search, tapping through, member screen, steppers. **Redemption has never completed.** Every control in the modal was inert until V19 was fixed the same day |
 | POS redemption success path | **BUILT, UNVERIFIED** — [LIVE ONLY unless a UK location is added, checklist A1–A3] | The V18 guard's refusal path is verified twice; the happy path needs a GBP till and this store has none |
 | Online enrolment | **BUILT, UNVERIFIED** | `POST /api/admin/members` with the D10 duplicate-email check, covered in the suite. Never exercised from a storefront — and there is no storefront |
@@ -1327,6 +1330,80 @@ implementation and no verification story.**
    see.
 3. **Nothing customer-facing exists**, and no sprint has yet been planned that
    builds it.
+
+---
+
+## M4 audit — the Voucher and reward engine, 9 Sep 2026
+
+Requested before extending it, because `quote()` already returns
+`redeemable_pence` and the member screen already renders a voucher balance and
+£5 steppers, so some of M4 plainly existed and the question was which parts.
+Audited against `IMPLEMENTATION_PLAN.md` M4. Same three states as the 3 Sep
+audit, with the strict reading: pure-logic unit tests alone count as
+**UNVERIFIED**.
+
+**The headline: M4 splits cleanly in two.** The derived balance is built and
+genuinely verified. The issued reward is a schema and a birthday job with no
+lifecycle at all.
+
+### The derived balance — BUILT AND VERIFIED
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| `BalanceCalculator::derive()` | **BUILT AND VERIFIED** | `floor(available/threshold) * value`, reads the rule version, floors negatives at zero per Q3 |
+| Derivation boundary cases | **VERIFIED** | `fixtures/loyalty-arithmetic.json` carries all four the plan names — 99→0, 100→£5, 199→£5, 200→£10 — plus the Blueprint 190→£5, −50→0, and a case proving it does not hardcode 100 and 500 |
+| `VoucherBalance` value object | **BUILT AND VERIFIED** | increments, balance, remainder, points-to-next |
+| Cache and reconciliation | **BUILT AND VERIFIED** | `refreshCache()` / `verify()`; `loyalty:verify-ledger` exits non-zero on drift |
+| `quote()` exposing `redeemable_pence` | **BUILT AND VERIFIED** | Online redemption A1–A4 on the dev store, 2 Sep 2026 |
+| Voucher balance rendered to staff | **BUILT AND VERIFIED** | `MemberProfileScreen.jsx:260`; and "£150 of voucher value" on a real till, 3 Sep 2026 |
+
+**This clears the strict bar.** It is not unit tests standing alone: the same
+derivation was exercised through a real checkout *and* rendered on a real
+device. It is the second-strongest evidence in the project after the ledger
+arithmetic.
+
+### The issued reward — schema and birthday issuance only
+
+| Item | Status | Evidence, or what is missing |
+| --- | --- | --- |
+| `loyalty_rewards` table | **BUILT** | All five states incl. `superseded`, plus `cancelled_reason`, `superseded_by_reward_id`, and `uq_reward_birthday` making the daily job idempotent. **The schema anticipates the whole engine** |
+| `Reward` model | **BUILT, UNVERIFIED** | `isOutstanding()` is its only behaviour |
+| Birthday issuance | **BUILT, UNVERIFIED** | `BirthdaySweep` + `LoyaltyIssueBirthdayRewards`, scheduled, covered by `LoyaltySweepsTest` / `ScheduledEngineTest`. Never run on a real shop, and has issued nothing here |
+| `RewardList` with state pills | **BUILT, UNVERIFIED** | Exists as `VouchersTab` inside `MemberProfileScreen.jsx:429`, not a standalone component. Tested at `MemberProfileScreen.test.jsx:233` |
+| `GET .../rewards` | **BUILT DIFFERENTLY** | No separate endpoint; served embedded via `MemberPresenter.php:136`. Works, but is not the specified route |
+| **`RewardStateMachine`** | **NOT BUILT** | **No reward state transition exists anywhere in `app/`.** A reward is born `issued` and can never become anything else |
+| **`ExpireRewardsJob`** | **NOT BUILT** | Nothing scheduled. `loyalty:expire-points` expires points. **An issued reward outlives its own `expires_at` indefinitely** |
+| **`RewardIssuer`** | **NOT BUILT** | Only `BirthdaySweep` issues. No goodwill path |
+| **`RewardsController`** | **NOT BUILT** | No `POST /api/admin/rewards`, `/cancel` or `/reissue` |
+| **`IssueGoodwillModal`, `CancelRewardModal`, `ReissueRewardAction`** | **NOT BUILT** | `MemberProfileScreen.jsx:114` is a hardcoded `<s-button disabled>Issue voucher</s-button>`; `VouchersScreen` is a placeholder |
+| **Redeeming an issued reward** | **NOT BUILT** | `app/Domain/Redemption/` never references `Reward`. M4 says the till "may redeem either"; it can only redeem the derived balance. `Redemption.reward_id` exists and nothing sets it |
+| **`PublishBalanceMetafieldJob` / V4** | **NOT BUILT** | `DiscountFunctionGateway.php:67` publishes a per-redemption quote only. Nothing publishes a standing customer-level `voucher_balance_pence`, and `member_status` and `segment` are never published as metafields at all |
+| M4's two events | **BUILT AS A SEAM** | `VOUCHER_INCREMENT_REACHED` and `BIRTHDAY_REWARD_ISSUED`, both dropped into `NullEventBus`. The first fired from one path only until V20 |
+| Test: expiry reduces the balance without touching a reward row | **NOT WRITTEN** | — |
+| Test: metafield published once per balance change | **NOT WRITTEN** | Nothing to assert against |
+
+### The two findings this audit raised
+
+**V20, fixed the same day.** `voucher.increment_reached` fired from
+`MaturitySweep` alone, so a member pushed over £5 by a manual adjustment was
+never told. The sweep behind it found **three silent upward paths and a latent
+fourth**, not one. The crossing rule now lives in `VoucherCrossing` and every
+path shares it. See `DECISIONS.md`.
+
+**V21, parked pending a briefing.** The reward lifecycle. Parked at the
+client-side lead's direction because it overlaps V14: both turn on what a stored
+column is allowed to mean. See `DECISIONS.md`.
+
+### One caution, in the same spirit as the 3 Sep three
+
+**A placeholder screen and a missing state machine look identical in a status
+table and are not the same thing.** Before this audit, everything above was
+folded under one **BUILT AND VERIFIED** row plus a parenthetical about three
+placeholder screens — which read considerably greener than the evidence
+supported. A screen is a day's work against a settled design. A state machine
+whose absence leaves five declared states unreachable is a design decision that
+has not been taken. The Vouchers placeholder is the second kind wearing the
+first kind's clothes.
 
 ---
 

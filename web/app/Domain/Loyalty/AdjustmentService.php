@@ -52,6 +52,7 @@ final class AdjustmentService
         private readonly RulesVersionRepository $rules,
         private readonly StaffRoleResolver $staffRoles,
         private readonly AuditLogger $audit,
+        private readonly VoucherCrossing $crossings,
     ) {}
 
     /**
@@ -152,7 +153,14 @@ final class AdjustmentService
         $reason = $this->composeReason($reasonCategory, $notes);
         $rules = $this->rules->current($account->shop_domain);
 
-        return DB::transaction(function () use (
+        // V20. Taken before the posting, because the voucher increment event
+        // fires on a crossing and a crossing needs both sides. An adjustment
+        // reaches the available bucket exactly as a maturity does, so a member
+        // pushed over an increment by hand is owed the same notification - and
+        // did not get one while the crossing rule lived inside MaturitySweep.
+        $before = $this->balances->for($account);
+
+        $result = DB::transaction(function () use (
             $account, $staff, $signedPoints, $bucket, $reasonCategory, $notes,
             $reason, $key, $rules, $projection, $limit
         ): array {
@@ -206,6 +214,13 @@ final class AdjustmentService
                 'replayed' => false,
             ];
         });
+
+        // After the commit, never inside it: an event emitted inside a
+        // transaction that then rolls back tells a member about five pounds
+        // they do not have.
+        $this->crossings->announce($account, $before, $result['balances']);
+
+        return $result;
     }
 
     /**

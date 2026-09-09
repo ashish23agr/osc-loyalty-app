@@ -858,6 +858,8 @@ none is silently assumed.
 | **V17** | **The tile discards the reason a request failed**, mapping every error but two to "That search could not be run." — raised 3 Sep 2026 | `OUTSTANDING` — small fix; third time in one day that a swallowed error cost time | Sprint 3 tail |
 | **V18** | **The TILL is a second denominator that V13 could not see** — a US-located till reports `USD` while the shop stays `GBP`, so GBP 50 of points would have discounted $50 and printed "£50.00" — found 3 Sep 2026 | **guard `RESOLVED` 3 Sep 2026** — refusal path verified twice; **success path UNVERIFIED**, no GBP till exists here | Sprint 3 |
 | **V19** | **The tile listens for `onPress` and `onSubmit`, which POS components never emit** — nine buttons, the results list, the step controls and redeem are all inert — found 3 Sep 2026 | `OUTSTANDING` — **BLOCKS SPRINT 3**; steps 9-12 were never reachable | Sprint 3 |
+| **V20** | **`voucher.increment_reached` fired from one code path only** — a member pushed over a five-pound increment by a manual adjustment, or by points restored on a refund, was never told — found 9 Sep 2026 | **`RESOLVED` 9 Sep 2026 for the adjustment path**; the refund-restore path is raised and awaiting a decision | Sprint 3 |
+| **V21** | **The reward lifecycle is a missing state machine** — `loyalty_rewards` models five states and only `issued` is reachable; no transition to `redeemed`, `expired`, `cancelled` or `superseded` exists anywhere — found 9 Sep 2026 | `PARKED` pending a briefing — **overlaps V14**; both turn on what a stored column is allowed to mean | Sprint 5 gate |
 
 ### V1 — UI layer · `RESOLVED` 2026-08-26, **corrected 2026-08-27**
 
@@ -1786,6 +1788,113 @@ greener than the evidence supports — which is exactly what happened on 3 Sep 2
 when "all five searches return the member" was recorded before anyone had tapped
 a result.
 
+### V20 - `voucher.increment_reached` fired from one code path only · `RESOLVED` 2026-09-09 (adjustment path)
+
+**The defect.** The proposal promises a member is told when their balance
+crosses another voucher increment, and `LoyaltyEventName::VOUCHER_INCREMENT_REACHED`
+exists for exactly that. It was emitted from **one** place: `MaturitySweep`,
+where the crossing rule also lived. Points reach the available bucket by more
+routes than maturity, so a member pushed over £5 by a manual adjustment was
+never told - and nothing in a green suite could see it, because the event has no
+receiver yet. Its absence stays invisible until Klaviyo is wired in Sprint 4 and
+a marketer says a flow is missing people.
+
+**Found by asking a different question.** Not by a test and not on a device, but
+by auditing M4 against the plan and noticing that `AdjustmentService` computed
+`voucherAfter` at line 81 and did nothing with it.
+
+**The sweep, which mattered more than the fix.** `LedgerPosting` is the single
+chokepoint into the ledger, so its named constructors enumerate every way points
+can move. Four can raise the available balance and therefore cross an increment:
+
+| Path | Caller | Before |
+| --- | --- | --- |
+| `maturity()` | `MaturitySweep` | **announced** |
+| `adjustment()`, available bucket, positive | `AdjustmentService:159` | **silent - V20** |
+| `redemptionRestore()` | `RefundReversalService:100` | **silent - raised, see below** |
+| `openingBalance()` | **no callers** | dormant; becomes a fourth the day the migration importer is written |
+
+So this was three instances and a latent fourth, not one.
+
+**The fix, and why it is not a second copy of the emit.** The crossing rule now
+lives in `App\Domain\Loyalty\VoucherCrossing`, which owns the comparison, the
+upward-only rule and the payload. `MaturitySweep` delegates to it and keeps only
+`POINTS_AVAILABLE`, which is genuinely maturity-specific; `AdjustmentService`
+calls the same object. Copying six lines would have left two definitions of "did
+we cross" to drift, and the payload shape matters beyond tidiness: a Klaviyo flow
+keys on the event name, so the same name arriving with a different shape
+depending on what moved the points is a live defect waiting for Sprint 4.
+
+Announced **after** the transaction commits, never inside it. An event emitted
+inside a transaction that then rolls back tells a member about five pounds they
+do not have.
+
+**Verified** by three tests at the endpoint, not the service - 340 to 400 points
+crosses and announces once with `increments_gained: 1` and £20; 340 to 390 stays
+on three increments and announces nothing; a deduction announces nothing. Then
+by reintroducing the defect: one failure, naming it. The endpoint is where a
+member's balance actually moves, and a service-level test would have stood where
+this defect could not be seen - the testing principle, fifth instance.
+
+**Left open, and deliberately.** `RefundReversalService` restores redeemed points
+and can net-cross upward, and it is silent. The code fix is the same single call.
+Whether it *should* announce is not a code question: a refund is not a happy
+moment, and "you have another five pounds" arriving alongside one may be wrong
+for reasons that have nothing to do with arithmetic. **Awaiting a decision.**
+
+Backend 464 tests / 2,088 assertions, Pint clean.
+
+---
+
+### V21 - The reward lifecycle is a missing state machine · `PARKED` 2026-09-09 · overlaps V14
+
+**Raised by the M4 audit** and recorded rather than built, at the client-side
+lead's direction, because it turns on the same reasoning V14 is parked on.
+
+**The finding.** `loyalty_rewards` declares five states - `issued`, `redeemed`,
+`expired`, `cancelled`, `superseded` - with `cancelled_reason` and
+`superseded_by_reward_id` alongside them. The schema anticipates the whole
+engine. **Exactly one state is reachable.** A grep for a transition across
+`app/` finds nothing: no `RewardStateMachine`, no `ExpireRewardsJob`, no cancel
+or reissue route, and `app/Domain/Redemption/` never references `Reward` at all,
+so the till cannot redeem an issued reward even though M4 says it "may redeem
+either". `Redemption.reward_id` and `LedgerPosting`'s `reward_id` exist and
+nothing sets them.
+
+The practical consequence: a birthday reward issued today reads `issued`
+forever - past its own `expires_at`, after it has been redeemed, regardless.
+**`state` is currently decoration.**
+
+**Not live on the development store.** Checked read-only, 9 Sep 2026:
+`loyalty_rewards` holds **0 rows**, and no reward-linked ledger entry or
+redemption exists. Nor could it - the store's single account holds no date of
+birth, and `BirthdaySweep` eligibility is date of birth on record and nothing
+else (C4), so the scheduled job has been running daily and correctly issuing
+nothing. The gap is latent. It becomes real at the first genuine birthday on
+OSC's store, or at migration.
+
+**Why it is parked and not built.** Making `state` mean something requires
+deciding what a transition is allowed to imply about a stored column, and what a
+reader of that column may assume - which is V14's question in a different place.
+V14 holds because the candidate fix changes what `qualifying_value_pence` means
+and the reporting design must agree first. The same is true here: whether expiry
+rewrites `state`, or is derived on read from `expires_at` the way the voucher
+balance is derived from points (D1's own pattern, and arguably the more
+consistent answer), changes what every reader of that column is entitled to
+conclude. **Deciding both at once, unbriefed, is how a schema acquires two
+incompatible conventions.**
+
+**When it is briefed, extend rather than duplicate.** `derive()` stays untouched
+as the derived half. `RewardIssuer` is extracted *from* `BirthdaySweep`'s
+issuance logic rather than written beside it. `RewardList` grows in
+`MemberProfileScreen`'s existing `VouchersTab`, which already renders type,
+value, dates, a state pill and the cancellation reason. `Redemption.reward_id`
+and `LedgerPosting`'s `reward_id` are the existing redemption seam. The one
+genuinely new piece is the state machine, and the schema already dictates its
+shape.
+
+---
+
 ## 7. Change log
 
 | Date | Change |
@@ -1797,6 +1906,7 @@ a result.
 | 2026-08-26 | C6 mechanism confirmed and answered for the development store (shop owner of `loyalty-system.myshopify.com`). The named person for the live store is pending client confirmation — **ask OSC / Robert**. Sprint 1 unblocked. |
 | 2026-08-26 | Week-zero validations: V1, V3, V5 and V8 all resolved. V5 changed the scope list (`read_discounts` added) and simplified M6 (`functionHandle` removes the `shopifyFunctions` lookup). V3 found and fixed a too-short test secret in `phpunit.xml`. |
 | 2026-08-27 | Sprint 1 API endpoints built. C11 raised: the club card number is derived from the account id rather than stored, pending an OSC position on physical cards. |
+| 2026-09-09 | **M4 audited against the plan, and two findings raised.** The Voucher and reward engine splits cleanly: the **derived balance is built and genuinely verified** (`derive()` covers all four spec boundary cases, and the same derivation was exercised through a real checkout and rendered on a real till), while the **issued reward is a schema and a birthday job with no lifecycle** - V21. **V20 found and fixed**: `voucher.increment_reached` fired from `MaturitySweep` alone, so a manual adjustment crossing £5 told nobody; the crossing rule now lives in `VoucherCrossing` and both paths share it. The sweep behind it found three silent paths and a latent fourth, not one. **V21 parked pending a briefing**, overlapping V14. Dev-store `loyalty_rewards` confirmed empty, read-only, so V21 is latent rather than live. Backend 464/2,088, Pint clean. |
 | 2026-08-27 | **V1 corrected.** The console shipped rendering as unstyled text: `index.html` loaded `app-bridge.js` only, and the Polaris `s-*` components come from a second script, `polaris.js`. App Bridge registers the `ui-*` elements and reads `s-page` but defines no `s-*`, so the admin navigation worked while every page did not. Both tags are now loaded, with a boot guard and a document test against recurrence. |
 | 2026-08-27 | **Sprint 1 complete.** 16 admin endpoints, each role-guarded and audited; every Sprint 1 screen built (A1–A5, A10, A12) and verified in a browser. Stubbed to their owning sprints: the enrol-member modal (M1, endpoint already built and tested) and every export (Sprint 5 Reports). 209 backend tests / 1,073 assertions and 128 frontend tests, all green. |
 | 2026-08-27 | **D3, D8 and D9 marked `ASSUMED`** — built to their recommendation, client notified, awaiting an objection rather than an approval. D3 (earn base net of VAT and shipping) and D9 (proportional refund restore) no longer block Sprint 2; D8 (the redemption ladder order) is fixed in the shared arithmetic fixtures as the Sprint 3 contract. |

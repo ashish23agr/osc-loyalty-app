@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Domain\Events\LoyaltyEventName;
+use App\Domain\Events\NullEventBus;
 use App\Models\AuditEntry;
 use App\Models\LedgerEntry;
 use App\Support\Audit\AuditAction;
@@ -390,5 +392,95 @@ class AdjustmentEndpointTest extends AdminApiTestCase
         )->assertStatus(201);
 
         $this->assertNull(LedgerEntry::where('entry_type', 'adjustment')->sole()->expires_at);
+    }
+
+    /**
+     * V20. An adjustment reaches the available bucket exactly as a maturity
+     * does, and 340 -> 400 points gains a fourth five-pound increment. Until
+     * the crossing rule moved out of MaturitySweep, only maturity announced,
+     * so a member pushed over by hand was never told - a notification the
+     * proposal promises.
+     *
+     * Asserted from the endpoint rather than the service, because the endpoint
+     * is where a member's balance actually moves and a service-level test
+     * would stand where this defect could not be seen.
+     */
+    public function test_an_adjustment_that_crosses_an_increment_announces_it(): void
+    {
+        $events = app(NullEventBus::class);
+        $events->forget();
+
+        $member = $this->memberWith340Points();
+
+        $this->postJson(
+            '/api/admin/members/'.$member->id.'/adjustments',
+            $this->validBody(['points' => 60]),
+            $this->headersFor('manager', 660002),
+        )->assertCreated();
+
+        $crossings = array_values(array_filter(
+            $events->emitted(),
+            fn ($event): bool => $event->name === LoyaltyEventName::VOUCHER_INCREMENT_REACHED,
+        ));
+
+        $this->assertCount(1, $crossings, 'A crossing by hand is still a crossing.');
+        $this->assertSame(4, $crossings[0]->properties['increments']);
+        $this->assertSame(1, $crossings[0]->properties['increments_gained']);
+        $this->assertSame(2000, $crossings[0]->properties['voucher_balance_pence']);
+        $this->assertSame($member->id, $crossings[0]->loyaltyAccountId);
+    }
+
+    /**
+     * The other half of the rule, and the half that makes the event worth
+     * sending: 340 -> 390 stays on three increments, so there is no new five
+     * pounds and announcing one would promise a voucher that is not there.
+     */
+    public function test_an_adjustment_that_does_not_cross_announces_nothing(): void
+    {
+        $events = app(NullEventBus::class);
+        $events->forget();
+
+        $member = $this->memberWith340Points();
+
+        $this->postJson(
+            '/api/admin/members/'.$member->id.'/adjustments',
+            $this->validBody(['points' => 50]),
+            $this->headersFor('manager', 660002),
+        )->assertCreated();
+
+        $this->assertSame(
+            [],
+            array_values(array_filter(
+                $events->emitted(),
+                fn ($event): bool => $event->name === LoyaltyEventName::VOUCHER_INCREMENT_REACHED,
+            )),
+            'Fifty points is not another five pounds.',
+        );
+    }
+
+    /**
+     * A deduction cannot announce a gain. Downward movement is not news anyone
+     * wants sent to them, and expiry carries its own warning.
+     */
+    public function test_a_deduction_announces_no_crossing(): void
+    {
+        $events = app(NullEventBus::class);
+        $events->forget();
+
+        $member = $this->memberWith340Points();
+
+        $this->postJson(
+            '/api/admin/members/'.$member->id.'/adjustments',
+            $this->validBody(['direction' => 'deduct', 'points' => 100]),
+            $this->headersFor('manager', 660002),
+        )->assertCreated();
+
+        $this->assertSame(
+            [],
+            array_values(array_filter(
+                $events->emitted(),
+                fn ($event): bool => $event->name === LoyaltyEventName::VOUCHER_INCREMENT_REACHED,
+            )),
+        );
     }
 }
