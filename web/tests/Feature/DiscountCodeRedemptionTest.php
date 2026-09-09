@@ -7,6 +7,7 @@ use App\Domain\Loyalty\LedgerService;
 use App\Domain\Orders\OrderSource;
 use App\Domain\Redemption\DiscountCodeGateway;
 use App\Domain\Redemption\DiscountCodeWriter;
+use App\Domain\Redemption\DiscountFunctionGateway;
 use App\Domain\Redemption\MetafieldWriter;
 use App\Domain\Redemption\QuoteExpirySweep;
 use App\Domain\Redemption\RedemptionGateway;
@@ -134,7 +135,7 @@ class DiscountCodeRedemptionTest extends TestCase
         $this->assertSame($minted['node_gid'], $redemption->shopify_discount_gid);
 
         // One mechanism, not two.
-        $this->assertSame([], $this->metafields->written);
+        $this->assertSame([], $this->metafields->writtenForKey(DiscountFunctionGateway::METAFIELD_KEY));
     }
 
     public function test_the_minimum_basket_rule_reaches_the_code(): void

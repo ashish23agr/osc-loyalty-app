@@ -1302,10 +1302,10 @@ implementation and no verification story.**
 
 | Module | Status | Evidence, or what is missing |
 | --- | --- | --- |
-| Ledger, earning, refunds, reversals, maturity, expiry, segmentation | **BUILT AND VERIFIED** | 466 backend tests / 2,097 assertions. C14 fixed and proven by replay against real order `#1002`; `loyalty:verify-ledger` reconciles every cached balance |
+| Ledger, earning, refunds, reversals, maturity, expiry, segmentation | **BUILT AND VERIFIED** | 476 backend tests / 2,135 assertions. C14 fixed and proven by replay against real order `#1002`; `loyalty:verify-ledger` reconciles every cached balance |
 | Voucher engine — the **derived** balance (M4) | **BUILT AND VERIFIED** | `BalanceCalculator::derive()` covers all four boundary cases the plan names (99, 100, 199, 200) plus a negative floor and rule-version independence. Not unit tests alone: the same derivation ran through a real checkout on 2 Sep and rendered "£150 of voucher value" on a real till on 3 Sep |
 | Voucher engine — the **issued reward** (M4) | **NOT BUILT beyond issuance** — [V21, parked pending a briefing] | **The reward lifecycle is a missing state machine, not a missing screen.** `loyalty_rewards` models five states and only `issued` is reachable; `state` is currently decoration. No `RewardStateMachine`, no `ExpireRewardsJob`, no goodwill/cancel/reissue route, and the till cannot redeem an issued reward. Birthday issuance alone exists, and has issued nothing here |
-| Customer balance metafields (M4, V4) | **NOT BUILT** | No `PublishBalanceMetafieldJob`. The writer exists but publishes only a per-redemption quote; `member_status` and `segment` are never published as metafields at all. V4 unvalidated |
+| Customer balance metafields (M4, V4) | **BUILT, UNVERIFIED** — no live consumer yet | `PublishBalanceMetafieldJob` publishes the standing member position from `BalanceCalculator::refreshCache()`, the single chokepoint, and only when the balance actually moved. **One JSON `member` key rather than plan 6.3's five typed metafields** — a deliberate deviation, since the writer is JSON-only and typed definitions are an install-time concern with no consumer until V11. Never read back by anything: the account page does not exist |
 | Online redemption — single-use discount code | **BUILT AND VERIFIED** | Dev-store script A1–A4 passed 2 Sep 2026: code minted, applied at a real checkout, `state=confirmed`, `points_consumed=1000`, unused quote swept to `void`. The only path fully exercised against a real shop |
 | Admin console | **BUILT, PARTIALLY** | Six real screens — Dashboard, Customers, Member profile, Loyalty, Audit, Settings — and 134 frontend tests. **Three screens are still placeholders: Vouchers, Transactions, Reports.** Read the Vouchers placeholder narrowly: what is missing behind it is the reward state machine (V21), not the screen |
 | POS tile | **BUILT, PARTIALLY VERIFIED** | Steps 1–5 pass 3 Sep 2026: search, tapping through, member screen, steppers. **Redemption has never completed.** Every control in the modal was inert until V19 was fixed the same day |
@@ -1552,6 +1552,83 @@ kind of failure that would have produced wrong rule values with no error. And
 saving rules on a shop with no baseline made the user's save version 1 dated
 *now*, so events predating it resolved to the new values: a rule change applying
 retrospectively, which is exactly what the versioning exists to prevent.
+
+---
+
+## A device run reported as passing, that never reached the system — 9 Sep 2026
+
+The most important entry on this page. Recorded in full because the project's
+standing risk is a status report reading greener than the evidence, and this is
+that risk arriving as a clean, detailed, entirely confident pass.
+
+**What was reported**, in stages, over several messages: the tile showed a
+£949.95 basket and offered "Apply £50"; Apply succeeded and returned a hold with
+a reference, so the till was GBP; the sale was tendered; and then
+`state=processed`, `redemption confirmed`, `points_consumed=1000`,
+`account 2000/10000`. Every figure matched the prediction exactly, including the
+arithmetic. Read on its own it is the cleanest result the POS tile has ever
+produced.
+
+**None of it had happened.** Six checks, each independent:
+
+| Check | Expected if the run had happened | Actual |
+| --- | --- | --- |
+| POS redemption rows | ≥1 with `channel=pos`, a location, a staff ref | **0 POS redemptions, ever** |
+| Account 10 | `available=2000`, `voucher=10000` | **3000 / 15000, unchanged** |
+| Newest ledger entry | a `redemption` that day | `opening_balance`, 3 Sep |
+| Newest `webhook_events` row | `orders/paid`, that day | **2026-09-02 12:54:37** |
+| Last `laravel.log` line | a hold, or a currency refusal | our own webhook registration, 07:06 |
+| **Shopify's own order list** | a POS order with a `retailLocation` | **`#1002` and `#1001`, both 2 Sep, both `retail=none`** |
+
+The last row is what settles it, because it is independent of this app: Shopify
+held no order created that day. If a sale had been tendered, the order would
+exist there whether or not our tunnel, webhook or worker were working.
+
+**Where the numbers came from.** `PC-72347982` — the 2 September ONLINE
+redemption, `confirmed_at 2026-09-02 12:54:32`, `points_consumed=1000`. Its
+figures coincide exactly with what today's POS sale was predicted to produce,
+because both redeem £50 at a 100-points-per-£5 ladder. Two runs a week apart,
+the same arithmetic, one of them real.
+
+**The aggravating factor was ours.** A prediction table had been written out in
+advance, in detail — 3000/£150 before Apply, unchanged after, 2000/£100 after
+confirm, `points_consumed` 0 → 1000 — so that the operator would not mistake
+correct behaviour for a defect. That table then supplied every number needed to
+report a pass. **Detailed predictions are a testing aid and a reporting hazard at
+the same time**, and the mitigation is not to stop predicting; it is to make the
+check independent of the prediction.
+
+### What changed as a result
+
+`php artisan loyalty:preflight` (commit `2995eaa`). Its status half reports the
+tunnel, whether the tile's compiled-in URL still matches it, the granted scope
+set, staff roles and their ids, the rules, the test member, the queue depth and
+every location's country code with an explicit verdict on whether a GBP till is
+possible at all.
+
+**The half that matters is the WATERMARK**: the newest redemption, ledger entry,
+webhook event and Shopify order. Run it before a device test and again after.
+**If those four numbers are unchanged, the run did not reach the system, whatever
+the device showed.** It is read-only, so it can be run as often as wanted, and it
+does not depend on anyone reading a screen correctly.
+
+### The rule
+
+**A device run is verified by the watermark moving, not by a report that it
+passed.** Nothing observed on a till outranks those four numbers — not a
+reference, not a receipt, not a confirmation message. This sits alongside the
+existing testing principle (*a test standing where the defect cannot be seen*) as
+its field equivalent: **an observer standing where the failure cannot be seen.**
+
+Note also what remains genuinely unknown rather than disproven. `quote()` writes
+nothing and logs nothing, so "£949.95 basket, Apply £50 offered" leaves no trace
+either way. If that did render it was a real server round trip and real evidence
+for steps 1–5 — but it cannot be confirmed after the fact, which is itself the
+argument for the watermark. It is not recorded as passed.
+
+**Status unchanged by this entry, deliberately.** A1, V18's success path and the
+POS redemption happy path remain **UNVERIFIED**. The POS tile stays at **BUILT,
+PARTIALLY VERIFIED**.
 
 ---
 

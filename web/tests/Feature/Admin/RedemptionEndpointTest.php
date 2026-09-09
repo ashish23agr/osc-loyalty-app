@@ -6,6 +6,7 @@ use App\Domain\Loyalty\LedgerPosting;
 use App\Domain\Loyalty\LedgerService;
 use App\Domain\Loyalty\RedemptionLadder;
 use App\Domain\Redemption\DiscountCodeWriter;
+use App\Domain\Redemption\DiscountFunctionGateway;
 use App\Domain\Redemption\MetafieldWriter;
 use App\Models\AuditEntry;
 use App\Models\LedgerEntry;
@@ -187,7 +188,7 @@ class RedemptionEndpointTest extends AdminApiTestCase
             'till_currency' => 'GBP',
         ], $this->headersFor('agent', 810002))->assertStatus(201);
 
-        $this->assertSame([], $this->metafields->written);
+        $this->assertSame([], $this->metafields->writtenForKey(DiscountFunctionGateway::METAFIELD_KEY));
         $this->assertSame([], $this->codes->created);
     }
 
@@ -233,7 +234,7 @@ class RedemptionEndpointTest extends AdminApiTestCase
 
         // The function's metafield is not written any more: one mechanism, not
         // both, or a member would hold two offers for one quote.
-        $this->assertSame([], $this->metafields->written);
+        $this->assertSame([], $this->metafields->writtenForKey(DiscountFunctionGateway::METAFIELD_KEY));
 
         // Still nothing spent. Points move at orders/paid, not here.
         $this->assertSame(0, $redemption->points_consumed);

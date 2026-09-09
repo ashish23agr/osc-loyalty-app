@@ -859,6 +859,7 @@ none is silently assumed.
 | **V18** | **The TILL is a second denominator that V13 could not see** — a US-located till reports `USD` while the shop stays `GBP`, so GBP 50 of points would have discounted $50 and printed "£50.00" — found 3 Sep 2026 | **guard `RESOLVED` 3 Sep 2026** — refusal path verified twice; **success path UNVERIFIED**, no GBP till exists here | Sprint 3 |
 | **V19** | **The tile listens for `onPress` and `onSubmit`, which POS components never emit** — nine buttons, the results list, the step controls and redeem are all inert — found 3 Sep 2026 | `OUTSTANDING` — **BLOCKS SPRINT 3**; steps 9-12 were never reachable | Sprint 3 |
 | **V20** | **`voucher.increment_reached` fired from one code path only** — a member pushed over a five-pound increment by a manual adjustment, or by points restored on a refund, was never told — found 9 Sep 2026 | **`RESOLVED` 9 Sep 2026** — every production path that can raise the available balance now announces. **A downward crossing still has no event and is raised separately** | Sprint 3 |
+| **V22** | **The `no_role_assigned` refusal names no staff id**, so an Administrator cannot learn which id to assign and V16 was undiagnosable without a device-side read — found 9 Sep 2026 | **`RESOLVED` 9 Sep 2026** — the id is logged server-side on the refusal | Sprint 3 |
 | **V21** | **The reward lifecycle is a missing state machine** — `loyalty_rewards` models five states and only `issued` is reachable; no transition to `redeemed`, `expired`, `cancelled` or `superseded` exists anywhere — found 9 Sep 2026 | `PARKED` pending a briefing — **overlaps V14**; both turn on what a stored column is allowed to mean | Sprint 5 gate |
 
 ### V1 — UI layer · `RESOLVED` 2026-08-26, **corrected 2026-08-27**
@@ -1922,6 +1923,60 @@ shape.
 
 ---
 
+### Mechanism belongs on the dev store, fidelity belongs on OSC · `RULE` 2026-09-09
+
+Adopted to settle a question that was being re-litigated every time something
+could not be proven on the development store, and to stop the live-store
+checklist being read later as a list of things that were skipped.
+
+**The split.** POS **mechanism** verification belongs on the development store:
+does `Apply → hold → tender → orders/paid → confirm` actually work on real
+hardware. POS **fidelity** verification belongs on OSC's store: V12's tax, V16's
+real staff, B2's two real trading locations, VAT-inclusive presentation, and the
+live currency and timezone (C5).
+
+**Why the mechanism must be proved here and not deferred.** The four defects of
+3 Sep 2026 — the missing `appUrl`, the swallowed error reason, the till
+denominator and `onPress` — were all mechanism defects, all invisible to a green
+suite of 31 tests, and all found only by using the tile. Finding a V19-class
+defect for the first time on OSC's live till, mid-trade, in front of staff and a
+customer, is a categorically worse outcome than finding it on an artificial store
+whose only cost is a wasted afternoon. **The dev store's artificiality does not
+weaken it as a mechanism test, because a dead button is dead on any store.**
+
+**Why fidelity cannot be proved here, however long we try.** Three facts compose:
+the merchant address is locked to the United States, Shopify does not require a
+non-UK merchant to collect UK VAT above £135, and tax follows merchant
+establishment rather than location. So a VAT line appearing or not appearing here
+says nothing about OSC either way. That is not a gap to be closed with more
+effort; it is a property of the store. Two sessions were spent inferring it
+before it was read directly.
+
+**What this changes about the live-store checklist.** Section B is not a list of
+things that were skipped, deferred, or ran out of time. **It is the list of things
+whose evidence can only exist on a store with OSC's establishment, staff,
+locations and trading currency** — and every item on it will be done once, on
+that store, before launch. An item moves to B because the dev store *cannot*
+answer it, never because nobody got round to it. Read the other way round, an
+item that stays in A is one the dev store genuinely can settle, and leaving it
+unsettled here is a real gap rather than a scheduling note.
+
+**The corollary that decided against a second development store, 9 Sep 2026.**
+A UK-country development store was considered and rejected. The till is
+denominated by the market matching its **location's** country, proven by
+contextual pricing (`GB → GBP`, `CA → CAD`, `US → USD`), so a UK *store* buys a
+GBP till only because its default location inherits a UK address — which is
+exactly what a UK-addressed **location** gives on the store we already have, for
+ten minutes of admin against most of a day. **The store's country is not the
+lever; the location's address is.** No verified evidence would be lost either
+(dev stores are not exclusive, so `#1002` and its C14 replay stay where they
+are), but nothing would be gained for mechanism, and fidelity would still be
+missing because a development store's simulated tax is weaker evidence than one
+real discounted order at OSC. V12's route is unchanged and was not re-opened as
+a side benefit of this.
+
+---
+
 ## 7. Change log
 
 | Date | Change |
@@ -1933,6 +1988,9 @@ shape.
 | 2026-08-26 | C6 mechanism confirmed and answered for the development store (shop owner of `loyalty-system.myshopify.com`). The named person for the live store is pending client confirmation — **ask OSC / Robert**. Sprint 1 unblocked. |
 | 2026-08-26 | Week-zero validations: V1, V3, V5 and V8 all resolved. V5 changed the scope list (`read_discounts` added) and simplified M6 (`functionHandle` removes the `shopifyFunctions` lookup). V3 found and fixed a too-short test secret in `phpunit.xml`. |
 | 2026-08-27 | Sprint 1 API endpoints built. C11 raised: the club card number is derived from the account id rather than stored, pending an OSC position on physical cards. |
+| 2026-09-09 | **A device run was reported as having passed end to end when nothing had reached the system**, and `loyalty:preflight` was written in response. Six independent checks established it, the decisive one being that Shopify held no order created that day. The figures reported were the 2 September online redemption's, whose arithmetic coincides exactly. The aggravating factor was ours: a detailed prediction table, written so correct behaviour would not be mistaken for a defect, supplied every number needed to report a pass. New rule, recorded in `PROGRESS.md`: **a device run is verified by the watermark moving, not by a report that it passed** — the field equivalent of the existing testing principle. A1, V18's success path and the POS happy path remain UNVERIFIED. |
+| 2026-09-09 | **The mechanism/fidelity split adopted as a rule**, and a second development store rejected on the strength of it. Mechanism (does Apply → hold → tender → `orders/paid` → confirm work on real hardware) belongs on the dev store, because a dead button is dead on any store and finding a V19-class defect first on OSC's live till is categorically worse. Fidelity (V12's tax, V16's real staff, B2's two trading locations, VAT presentation, C5) belongs on OSC, because tax follows merchant establishment and this store's is locked to the US. **Section B is therefore not a list of things we skipped.** A UK-country dev store was rejected: the till follows its LOCATION's market, not the store's country, so it would buy nothing a UK-addressed location here does not. |
+| 2026-09-09 | **V22 found and fixed, unblocking V16's diagnosis.** The `no_role_assigned` 403 named no staff id, so an Administrator could learn THAT a till user had no role and never WHICH id to assign - and with no `read_users` scope there was no Admin API route to it either, which is what cost a temporary on-device diagnostic toast on 3 Sep. The id is now logged server-side on the refusal, asserted by a test that reads the log context, and verified by reintroducing the defect. **M4's balance metafield publisher built** alongside it: `PublishBalanceMetafieldJob`, dispatched from `BalanceCalculator::refreshCache()` - the single chokepoint - and only when the balance actually moved, which is what makes it once per balance change rather than once per ledger entry. Both assertions the M4 audit found missing are now written. V21 untouched and still parked. Backend 476/2,135, Pint clean. |
 | 2026-09-09 | **V20 closed on the refund path, and a sixth-event question raised in its place.** Decided: announce there too, because a member whose balance changed without being told is in the same position whichever way it moved. `RefundReversalService` announces on the **net** of a refund, once, after the commit. Arranging the test established that **a refund moves the available balance upward however large it is** unless the earn has already matured - restored redemption points credit `available` while an unmatured earn reversal debits `pending` - so a full £80 refund of the worked example takes a member from two increments to four. The instruction as given cannot be honoured literally: `voucher.increment_reached` asserts a gain, so a fall needs a sixth event name and the proposal commits to five (M11). **Recorded, not taken**, with the downward case pinned as deliberately silent. Backend 466/2,097, Pint clean. |
 | 2026-09-09 | **M4 audited against the plan, and two findings raised.** The Voucher and reward engine splits cleanly: the **derived balance is built and genuinely verified** (`derive()` covers all four spec boundary cases, and the same derivation was exercised through a real checkout and rendered on a real till), while the **issued reward is a schema and a birthday job with no lifecycle** - V21. **V20 found and fixed**: `voucher.increment_reached` fired from `MaturitySweep` alone, so a manual adjustment crossing £5 told nobody; the crossing rule now lives in `VoucherCrossing` and both paths share it. The sweep behind it found three silent paths and a latent fourth, not one. **V21 parked pending a briefing**, overlapping V14. Dev-store `loyalty_rewards` confirmed empty, read-only, so V21 is latent rather than live. Backend 464/2,088, Pint clean. |
 | 2026-08-27 | **V1 corrected.** The console shipped rendering as unstyled text: `index.html` loaded `app-bridge.js` only, and the Polaris `s-*` components come from a second script, `polaris.js`. App Bridge registers the `ui-*` elements and reads `s-page` but defines no `s-*`, so the admin navigation worked while every page did not. Both tags are now loaded, with a boot guard and a document test against recurrence. |

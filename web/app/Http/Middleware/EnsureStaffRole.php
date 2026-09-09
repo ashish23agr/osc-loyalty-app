@@ -8,6 +8,7 @@ use App\Models\StaffRole;
 use App\Support\Audit\RequestContext;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -55,6 +56,24 @@ class EnsureStaffRole
             // A known shop, but this staff member has no role. Deliberately not
             // granted anything: only the first person on an unconfigured shop is
             // bootstrapped, and after that an Administrator assigns roles.
+            //
+            // The id is logged because the refusal cannot carry it. V16 was
+            // undiagnosable without this: the message tells an Administrator
+            // THAT someone has no role and never WHICH id to assign, the app
+            // holds no `read_users` scope so there is no Admin API route from a
+            // name to an id, and the number is otherwise only visible on the
+            // device itself. On 3 Sep 2026 that cost a temporary on-device
+            // diagnostic toast to discover one id. This is the same fact,
+            // server-side and permanent.
+            Log::warning('Refusing a till request: this staff member holds no Privilege Club role', [
+                'shop' => $token->shopDomain,
+                // The id an Administrator must assign a role to.
+                'staff_user_id' => $token->staffUserId,
+                'channel' => $channel,
+                'required_floor' => $floor,
+                'path' => $request->path(),
+            ]);
+
             return response()->json([
                 'error' => [
                     'code' => 'no_role_assigned',

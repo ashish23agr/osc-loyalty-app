@@ -4,6 +4,7 @@ namespace App\Domain\Loyalty;
 
 use App\Domain\Rules\RuleSet;
 use App\Domain\Rules\RulesVersionRepository;
+use App\Jobs\PublishBalanceMetafieldJob;
 use App\Models\LedgerEntry;
 use App\Models\LoyaltyAccount;
 use App\Support\Money\Pence;
@@ -103,11 +104,30 @@ final class BalanceCalculator
      */
     public function refreshCache(LoyaltyAccount $account): Balances
     {
+        // Read before the write, because the published metafield is a cache and
+        // republishing it on every ledger entry would be one Admin API call per
+        // posting for a figure that mostly has not moved. M4 says the publish
+        // follows a BALANCE change, so that is what is compared.
+        $publishedBefore = (int) $account->voucher_balance_pence;
+
         $balances = $this->for($account);
 
         $account->forceFill($balances->toCacheAttributes() + [
             'caches_rebuilt_at' => now(),
         ])->save();
+
+        // M4. Dispatched from here rather than from each service because this is
+        // the single chokepoint every posting passes through - the V20 lesson,
+        // where a rule that lived in one caller meant only that caller obeyed
+        // it. A refund posts two entries and moves the voucher balance once, so
+        // this fires once.
+        //
+        // KNOWN GAP: a segment or status change does not pass through here, so
+        // it does not republish. SegmentSweep is its own chokepoint and would
+        // need its own dispatch; recorded rather than half-built.
+        if ($balances->voucher->pence() !== $publishedBefore) {
+            PublishBalanceMetafieldJob::dispatch((int) $account->id);
+        }
 
         return $balances;
     }

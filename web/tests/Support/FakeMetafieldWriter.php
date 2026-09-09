@@ -20,6 +20,18 @@ class FakeMetafieldWriter implements MetafieldWriter
     /** @var list<string> */
     public array $cleared = [];
 
+    /**
+     * Every write, in order, including repeats to the same slot.
+     *
+     * `$written` is keyed by slot so it answers "what will the function see",
+     * which is the usual question. M4 asks a different one - was the balance
+     * published ONCE per balance change rather than once per ledger entry - and
+     * that cannot be answered by a map that overwrites.
+     *
+     * @var list<array{shop:string, owner:string, key:string, value:array<string, mixed>}>
+     */
+    public array $calls = [];
+
     public bool $shouldFail = false;
 
     public function write(string $shopDomain, string $ownerGid, string $key, array $value): bool
@@ -29,8 +41,29 @@ class FakeMetafieldWriter implements MetafieldWriter
         }
 
         $this->written[$this->slot($shopDomain, $ownerGid, $key)] = $value;
+        $this->calls[] = ['shop' => $shopDomain, 'owner' => $ownerGid, 'key' => $key, 'value' => $value];
 
         return true;
+    }
+
+    /**
+     * Only what was written under one key.
+     *
+     * M4 added a second app-owned customer metafield - the standing `member`
+     * position - alongside the discount function's per-quote `voucher` payload.
+     * A test that means "the discount function was told nothing" must say so by
+     * key, because asserting on the whole map now also asserts that the balance
+     * cache was not republished, which is a different claim entirely.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function writtenForKey(string $key): array
+    {
+        return array_filter(
+            $this->written,
+            fn (string $slot): bool => str_ends_with($slot, ':'.$key),
+            ARRAY_FILTER_USE_KEY,
+        );
     }
 
     public function writeMany(string $shopDomain, array $metafields): int

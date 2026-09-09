@@ -7,6 +7,7 @@ use App\Models\StaffRole;
 use App\Support\Audit\RequestContext;
 use Firebase\JWT\JWT;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
@@ -101,6 +102,39 @@ class EnsureStaffRoleMiddlewareTest extends TestCase
         $this->getJson('/test/floor/viewer', $this->asStaff(424242))
             ->assertStatus(403)
             ->assertJsonPath('error.code', 'no_role_assigned');
+    }
+
+    /**
+     * V16. The refusal cannot carry the id - the message is read by a till user
+     * and naming a staff id at them helps nobody - so it goes to the log, which
+     * is the only place an Administrator can learn WHICH id to assign.
+     *
+     * Asserted rather than assumed because the whole point of the change is the
+     * id, and a log call with the wrong key or a missing one looks exactly like
+     * a working one from the outside. Without this the alternative was a
+     * temporary on-device diagnostic, which is what it cost on 3 Sep 2026.
+     */
+    public function test_the_refusal_logs_the_staff_id_an_administrator_must_assign(): void
+    {
+        app(StaffRoleResolver::class)->resolve(self::SHOP, 100000001);
+
+        $logged = [];
+
+        Log::listen(function ($message) use (&$logged): void {
+            $logged[] = $message;
+        });
+
+        $this->getJson('/test/floor/viewer', $this->asStaff(424242))->assertStatus(403);
+
+        $refusals = array_values(array_filter(
+            $logged,
+            fn ($m): bool => str_contains($m->message, 'holds no Privilege Club role'),
+        ));
+
+        $this->assertCount(1, $refusals, 'The refusal must say so exactly once.');
+        $this->assertSame(424242, $refusals[0]->context['staff_user_id'], 'The id is the whole point.');
+        $this->assertSame(self::SHOP, $refusals[0]->context['shop']);
+        $this->assertSame('viewer', $refusals[0]->context['required_floor']);
     }
 
     public function test_a_viewer_reaches_a_viewer_endpoint(): void
