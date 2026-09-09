@@ -856,9 +856,10 @@ none is silently assumed.
 | **V15** | **`@shopify/ui-extensions` installed at 2025.10.16 while the loyalty tile declares `api_version = "2026-07"`** - nothing pins the two together - found 3 Sep 2026 | `OUTSTANDING` - not blocking; resolve before trusting any conclusion drawn from those types | Sprint 3 tail |
 | **V16** | **Every till user needs a Privilege Club role and only the first staff member on a shop is bootstrapped** — an unassigned assistant gets `403 no_role_assigned` and the tile looks broken — found 3 Sep 2026 | `OUTSTANDING` — **BLOCKS GO-LIVE**; the implicit-viewer decision is parked next to C9 | Before production |
 | **V17** | **The tile discards the reason a request failed**, mapping every error but two to "That search could not be run." — raised 3 Sep 2026 | `OUTSTANDING` — small fix; third time in one day that a swallowed error cost time | Sprint 3 tail |
-| **V18** | **The TILL is a second denominator that V13 could not see** — a US-located till reports `USD` while the shop stays `GBP`, so GBP 50 of points would have discounted $50 and printed "£50.00" — found 3 Sep 2026 | **guard `RESOLVED` 3 Sep 2026** — refusal path verified twice; **success path UNVERIFIED**, no GBP till exists here | Sprint 3 |
+| **V18** | **The TILL is a second denominator that V13 could not see** — a foreign till would discount $50 for GBP 50 of points and print "£50.00" — found 3 Sep 2026 | **GUARD `WITHDRAWN` 9 Sep 2026 — it was never a second guard.** `session.currency` reports the SHOP's currency, so the comparison duplicates V13. **The defect is UNCOVERED**, not handled. Replacement is V24 | Sprint 3 |
 | **V19** | **The tile listens for `onPress` and `onSubmit`, which POS components never emit** — nine buttons, the results list, the step controls and redeem are all inert — found 3 Sep 2026 | `OUTSTANDING` — **BLOCKS SPRINT 3**; steps 9-12 were never reachable | Sprint 3 |
 | **V20** | **`voucher.increment_reached` fired from one code path only** — a member pushed over a five-pound increment by a manual adjustment, or by points restored on a refund, was never told — found 9 Sep 2026 | **`RESOLVED` 9 Sep 2026** — every production path that can raise the available balance now announces. **A downward crossing still has no event and is raised separately** | Sprint 3 |
+| **V24** | **A foreign till can denominate a sterling voucher in its own currency and nothing catches it** — the uncovered half of V18, now that its guard is withdrawn. `applyCartDiscount` takes a bare amount with no currency parameter, so the till always denominates — raised 9 Sep 2026 | `OUTSTANDING` — **BLOCKS GO-LIVE only if OSC ever trades outside GBP**; the client has confirmed UK-only, so it is a correctness gap rather than a launch gate | Sprint 3 tail |
 | **V23** | **A POS hold that PASSES records nothing about what it compared** — `till_currency` is never persisted and only logged on refusal, so a hold that succeeded on a US-addressed location cannot be explained; V18 may be comparing the SHOP currency, in which case it duplicates V13 and protects against nothing — found 9 Sep 2026 | `OUTSTANDING` — instrumented 9 Sep 2026, so the next successful POS hold answers it | Sprint 3 |
 | **V22** | **The `no_role_assigned` refusal names no staff id**, so an Administrator cannot learn which id to assign and V16 was undiagnosable without a device-side read — found 9 Sep 2026 | **`RESOLVED` 9 Sep 2026** — the id is logged server-side on the refusal | Sprint 3 |
 | **V21** | **The reward lifecycle is a missing state machine** — `loyalty_rewards` models five states and only `issued` is reachable; no transition to `redeemed`, `expired`, `cancelled` or `superseded` exists anywhere — found 9 Sep 2026 | `PARKED` pending a briefing — **overlaps V14**; both turn on what a stored column is allowed to mean | Sprint 5 gate |
@@ -2090,6 +2091,139 @@ instrument reporting a conclusion it cannot support.**
 
 ---
 
+### V18 withdrawn — the guard was never a second guard · `WITHDRAWN` 2026-09-09
+
+**Withdrawn rather than extended, deliberately.** A guard that duplicates another
+one while appearing to cover a different case is worse than no guard, because it
+makes the gap look closed. Extending it would keep implying the till denominator
+is handled. It is not handled. **It is uncovered.**
+
+**The decisive evidence: two different location markets, the same reported
+currency, both accepted.**
+
+| | `PC-23502758` | `PC-46033088` |
+| --- | --- | --- |
+| Location | `95318016240` — Shop location, **United States** | `95318049008` — My Custom Location, **Canada** |
+| Market base currency | USD | CAD |
+| Amount | £25 (stepped down from £50) | £10 |
+| `till_currency` reported | not logged (predates V23's instrumentation) | **`GBP`** |
+| `shop_currency` | GBP | **`GBP`** |
+| Outcome | **held** | **held** |
+
+```
+[2026-09-09 12:48:47] development.INFO: POS hold accepted
+  {"reference":"PC-46033088","till_currency":"GBP","rules_currency":"GBP",
+   "shop_currency":"GBP","location":95318049008,"amount_pence":1000}
+```
+
+`till_currency` and `shop_currency` are the same value, at a location whose
+market base currency is CAD. **So `session.currency` reports the SHOP's currency,
+not the location's** — and the guard has only ever compared shop-against-rules,
+which is exactly what V13 already does. V18 is V13 under another name.
+
+**What that means for the original defect.** It is **uncovered**. `£50` of points
+would still discount `$50` at a genuinely foreign till and still print
+"£50.00" on the receipt, because `applyCartDiscount(type, title, amount?)` takes
+a **bare string with no currency parameter** — the till denominates it, always,
+and no guard in this codebase changes that. Raised as **V24**.
+
+**Three things this cost, and they are worth naming.** V18's entry claimed a
+resolved guard for six days. Eight POS tests were rewritten to satisfy it, each
+now stating a till currency it does not meaningfully assert. And on 9 Sep 2026 a
+hold passing that guard was reported as proving its success path — which was the
+third false pass of a single day.
+
+> **A guard that can only pass is not evidence when it passes.**
+
+That is the sharpest statement of the day's pattern. Treating an outcome as
+informative without first asking whether any other outcome was possible is the
+same error as a test standing where the defect cannot be seen, an observer
+standing where the failure cannot be seen, and an instrument reporting a
+conclusion it cannot support.
+
+**What survives, independently of any of this.** The till **did** report `"GBP"`
+as a non-empty three-character string, so the plumbing from
+`shopify.session.currentSession` through `till_currency` to the guard works end
+to end and `session.currency` is a real, populated field. **Location attribution
+and staff attribution both worked** — `95318016240` and `95318049008` are the
+correct live locations for their respective sales, and `113711382768` is the
+pinned staff member on both. None of that depends on how V23 resolved, and none
+of it is withdrawn.
+
+**What stays true about the guards generally.** V13 is not withdrawn and fired
+for real on this store, minting a €50 voucher for a GBP programme. The lesson is
+not that currency guards are pointless; it is that this one was measuring a
+quantity it had already measured.
+
+**Replacement, and it is tomorrow's decision rather than today's.** The direction
+indicated by the evidence is to catch a mismatch **server-side from the order**
+rather than with another device-reported guard: the order's own
+`currencyCode`/`presentmentMoney` is what Shopify actually transacted, needs no
+device trust, and — because `hold()` writes `points_consumed => 0` and nothing is
+consumed until `orders/paid` — a guard at `confirm()` can refuse, alarm and
+**leave the member's points untouched**. Exposure narrows to one sale's discount
+rather than a silent, compounding points loss. Reading the currency back off
+`Cart.cartDiscount.currency` was considered and is still device-reported, so it
+would be a second guard built on a value of the same untrustworthy kind.
+`Percentage` was considered and rejected: 83.33% of a £60 basket stops matching
+the points consumed exactly, and the ledger's exactness is worth more than
+dodging the question. See V24.
+
+**Priority, in the client's actual circumstances.** OSC has confirmed **UK-only**
+trading, so at OSC the till, the shop and the rules will all read GBP and no
+mismatch can arise. V24 is therefore a **correctness gap, not a launch gate** —
+but it must not be recorded as handled, because the next person to read V18
+would otherwise believe a foreign till is caught.
+
+---
+
+### The enrolment path executed for the first time · 2026-09-09
+
+Recorded because the 9 Sep audit had it as **BUILT, UNVERIFIED** and it has now
+actually run against a real store. Two members were enrolled from the admin
+console:
+
+```
+[2026-09-09 10:34:15] loyalty_account_id 12  enrolment_channel: admin
+[2026-09-09 10:36:29] loyalty_account_id 13  enrolment_channel: admin
+```
+
+Both emitted `member.enrolled`, both were dropped by `NullEventBus` as designed
+(M11 is Sprint 4), and both carry `shopify_customer_id: null` — so they are
+MD1 members with an email and no Shopify customer record, which is a supported
+member rather than a defect. **`POST /api/admin/members` and the D10
+duplicate-email check are now exercised against a real shop.** Still unexercised
+from a storefront, because there is no storefront.
+
+---
+
+### Reading a log: the environment prefix is the discriminator · `RULE` 2026-09-09
+
+`web/storage/logs/laravel.log` interleaves **three** environments, and grepping
+the message alone finds the wrong one:
+
+- **`testing.*`** — the PHPUnit suite. `grep "POS hold accepted"` returns **117**
+  matches, almost all of these, including a deliberately lower-case `"gbp"`
+  fixture. Anyone reading them as device activity concludes the till reported GBP.
+- **`local.*`** — artisan commands run in a plain shell.
+- **`development.*`** — **requests served through the tunnel, i.e. everything the
+  POS device and the admin console actually do**, because `shopify app dev`
+  injects `APP_ENV=development`.
+
+```bash
+grep "development.*POS hold" web/storage/logs/laravel.log | tail -3
+```
+
+**The absence of `local.INFO` lines was NOT a log-level problem.** `LOG_LEVEL` is
+`debug` and nothing is filtered. It was a wrong filter: an instruction to grep
+for `local` excludes device traffic **by construction**, so it manufactures a
+false negative no matter what the device does. That instruction was given in this
+project on 9 Sep 2026 and nearly caused a successful Canada test to be read as
+nothing having arrived — which would have been the sixth variant of the day's
+pattern and the only one that invents a failure rather than hiding one.
+
+---
+
 ## 7. Change log
 
 | Date | Change |
@@ -2104,6 +2238,7 @@ instrument reporting a conclusion it cannot support.**
 | 2026-09-09 | **A device run was reported as having passed end to end when nothing had reached the system**, and `loyalty:preflight` was written in response. Six independent checks established it, the decisive one being that Shopify held no order created that day. The figures reported were the 2 September online redemption's, whose arithmetic coincides exactly. The aggravating factor was ours: a detailed prediction table, written so correct behaviour would not be mistaken for a defect, supplied every number needed to report a pass. New rule, recorded in `PROGRESS.md`: **a device run is verified by the watermark moving, not by a report that it passed** — the field equivalent of the existing testing principle. A1, V18's success path and the POS happy path remain UNVERIFIED. |
 | 2026-09-09 | **The mechanism/fidelity split adopted as a rule**, and a second development store rejected on the strength of it. Mechanism (does Apply → hold → tender → `orders/paid` → confirm work on real hardware) belongs on the dev store, because a dead button is dead on any store and finding a V19-class defect first on OSC's live till is categorically worse. Fidelity (V12's tax, V16's real staff, B2's two trading locations, VAT presentation, C5) belongs on OSC, because tax follows merchant establishment and this store's is locked to the US. **Section B is therefore not a list of things we skipped.** A UK-country dev store was rejected: the till follows its LOCATION's market, not the store's country, so it would buy nothing a UK-addressed location here does not. |
 | 2026-09-09 | **V22 found and fixed, unblocking V16's diagnosis.** The `no_role_assigned` 403 named no staff id, so an Administrator could learn THAT a till user had no role and never WHICH id to assign - and with no `read_users` scope there was no Admin API route to it either, which is what cost a temporary on-device diagnostic toast on 3 Sep. The id is now logged server-side on the refusal, asserted by a test that reads the log context, and verified by reintroducing the defect. **M4's balance metafield publisher built** alongside it: `PublishBalanceMetafieldJob`, dispatched from `BalanceCalculator::refreshCache()` - the single chokepoint - and only when the balance actually moved, which is what makes it once per balance change rather than once per ledger entry. Both assertions the M4 audit found missing are now written. V21 untouched and still parked. Backend 476/2,135, Pint clean. |
+| 2026-09-09 | **V18 WITHDRAWN — the guard was never a second guard, and the defect is uncovered.** The Canada test is decisive: `PC-46033088` held at location `95318049008`, whose market base is CAD, reporting `till_currency: GBP` identical to `shop_currency`. Two different location markets, the same reported currency, both accepted — so `session.currency` reports the SHOP's currency and the comparison duplicates V13. **£50 of points would still discount $50 at a genuinely foreign till**, raised as **V24** and stated as uncovered rather than handled. A hold passing that guard had been reported the same day as proving its success path: the third false pass of one day. *A guard that can only pass is not evidence when it passes.* What survives: the till did report `"GBP"` as a non-empty three-character string, and location and staff attribution both worked. V24 is a correctness gap rather than a launch gate, since OSC has confirmed UK-only. Also records the enrolment path executing for the first time (accounts 12 and 13, `enrolment_channel: admin`), and that the environment prefix - not the message - is what makes a log line readable. |
 | 2026-09-09 | **"A GB location is required for a POS hold" was wrong, and section A is corrected.** `PC-23502758` is a real POS hold on the US-addressed location `95318016240` — the guard is fail-closed and a refusal writes no row, so the device reported GBP and V18 passed. **A1–A3 are not blocked by this store's establishment**; they were blocked by a twenty-minute quote window and a sale not completed inside it (minted 10:32:59, never tendered, swept to `void` at 10:52:59). Section B keeps only what genuinely needs OSC's establishment: V12's tax, VAT presentation, V16's real staff, B2's two real trading locations. **V23 raised**: `till_currency` was never persisted and only logged on refusal, so a hold that passed could not be explained — either the session reports the location's currency (V18 sound) or the shop's (V18 duplicates V13 and protects against nothing). Now logged on acceptance with two tests, so the next successful hold settles it. Backend 478/2,141, Pint clean. |
 | 2026-09-09 | **V20 closed on the refund path, and a sixth-event question raised in its place.** Decided: announce there too, because a member whose balance changed without being told is in the same position whichever way it moved. `RefundReversalService` announces on the **net** of a refund, once, after the commit. Arranging the test established that **a refund moves the available balance upward however large it is** unless the earn has already matured - restored redemption points credit `available` while an unmatured earn reversal debits `pending` - so a full £80 refund of the worked example takes a member from two increments to four. The instruction as given cannot be honoured literally: `voucher.increment_reached` asserts a gain, so a fall needs a sixth event name and the proposal commits to five (M11). **Recorded, not taken**, with the downward case pinned as deliberately silent. Backend 466/2,097, Pint clean. |
 | 2026-09-09 | **M4 audited against the plan, and two findings raised.** The Voucher and reward engine splits cleanly: the **derived balance is built and genuinely verified** (`derive()` covers all four spec boundary cases, and the same derivation was exercised through a real checkout and rendered on a real till), while the **issued reward is a schema and a birthday job with no lifecycle** - V21. **V20 found and fixed**: `voucher.increment_reached` fired from `MaturitySweep` alone, so a manual adjustment crossing £5 told nobody; the crossing rule now lives in `VoucherCrossing` and both paths share it. The sweep behind it found three silent paths and a latent fourth, not one. **V21 parked pending a briefing**, overlapping V14. Dev-store `loyalty_rewards` confirmed empty, read-only, so V21 is latent rather than live. Backend 464/2,088, Pint clean. |
