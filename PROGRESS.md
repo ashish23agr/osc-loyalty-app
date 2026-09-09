@@ -1555,6 +1555,38 @@ retrospectively, which is exactly what the versioning exists to prevent.
 
 ---
 
+## Webhook delivery was dead between 3 and 9 September 2026
+
+Recorded because it is the kind of gap that gets assumed away rather than
+written down.
+
+**What was wrong.** All six Admin-API-registered subscriptions — `APP_UNINSTALLED`,
+`PRODUCTS_UPDATE`, `ORDERS_PAID`, `ORDERS_UPDATED`, `ORDERS_CANCELLED`,
+`REFUNDS_CREATE` — were still pointing at
+`arrive-weddings-setting-graham.trycloudflare.com`, the tunnel from the 3 Sep
+session. That host now returns **NXDOMAIN**: not a 530, not a timeout, it does
+not resolve at all. Shopify had nowhere to deliver to, and re-registration only
+happens on a fresh OAuth callback, so nothing corrected it. Re-registered
+against the live tunnel on 9 Sep 2026; `php artisan shopify:webhooks` now lists
+all six with no `[stale]` marker.
+
+**What this invalidates: nothing, as it happens — and that is the point of
+checking rather than assuming.** Nothing webhook-dependent was attempted in the
+window. The 3 Sep device run reached steps 1–5, which are direct calls from the
+tile to the app and do not involve a webhook; steps 6–12, which are the ones
+that need `orders/paid`, never ran. The online redemption evidence (A1–A4,
+2 Sep) predates the window and was proven by `state=confirmed` and
+`points_consumed=1000`, which is delivery having succeeded at the time.
+
+**The rule this leaves.** Any webhook-dependent result obtained after a tunnel
+change and before a `shopify:webhooks --register` proves nothing, and the failure
+is completely silent from the app's side: Shopify holds the subscription,
+delivery fails at DNS, and the app simply never hears. **Re-register after every
+tunnel change, and confirm no topic reads `[stale]` before trusting any result
+that depends on one.** A dead queue worker presents the same way (see
+Environment notes), which means "the points never arrived" has at least two
+silent causes and both must be ruled out before it is treated as a defect.
+
 ## Environment notes
 
 - Tests run on SQLite in memory; the schema is verified against both engines.
