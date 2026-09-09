@@ -1,3 +1,40 @@
+# Session handover
+
+## Resume this session
+
+```
+claude --resume 339fe3f1-80d1-4afc-b2ce-6b6f977829f7
+```
+
+Resuming keeps the whole 9 September context. Starting fresh means reading
+`PROGRESS.md` and `DECISIONS.md` instead - slower, and the reason this line is
+in a file rather than in a terminal scrollback.
+
+## Tomorrow's first check, before diagnosing anything
+
+**Check the POS device for an offline banner before diagnosing anything else.**
+Clean holds reaching the app with no order appearing on Shopify is the signature
+of an offline device, not of a currency or sequencing problem. That single check
+would have saved the afternoon of 9 September 2026.
+
+Then: `cd web && php artisan loyalty:preflight` for the watermark, and read
+**`PROGRESS.md` -> "Tomorrow - 10 September 2026, with a written time-box"**. The
+POS attempt is time-boxed to thirty minutes by rule; if it does not complete,
+A1-A3 move to Section B and customer-facing work starts that morning.
+
+---
+
+# The body below is from 3 September 2026 and is PARTLY SUPERSEDED
+
+Read it for background only. Two of its central claims were overturned on
+9 September: **V18's guard is withdrawn** - it only ever compared the shop
+currency, so the till denominator is uncovered (V24) - and **A1-A3 were never
+blocked by this store's configuration**, so no UK location is needed. The
+9 September record is in `PROGRESS.md` and `DECISIONS.md`, and where they
+disagree with anything below, they win.
+
+---
+
 # Session handover — end of 3 September 2026
 
 For a fresh session tomorrow. **Assumes you know nothing about today.**
