@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Events\LoyaltyEventName;
+use App\Domain\Events\NullEventBus;
 use App\Domain\Loyalty\ExpiryOutlook;
 use App\Domain\Loyalty\LedgerPosting;
 use App\Domain\Loyalty\LedgerService;
@@ -472,5 +474,108 @@ class RefundReversalTest extends TestCase
         $this->assertSame(20, $result['reversed']);
         $this->assertSame(0, $result['restored']);
         $this->assertSame(0, LedgerEntry::query()->where('entry_type', 'redemption_restore')->count());
+    }
+
+    /**
+     * V20. The worked example crosses upward on the net: 60 available points
+     * become 110 when 50 redeemed points come back, which is nought to one
+     * five-pound increment. The refund moves points both ways in one
+     * transaction, so the crossing is a fact about the net and is announced
+     * once for the refund rather than once per posting.
+     *
+     * Silent until the crossing rule moved out of MaturitySweep, because a
+     * refund is not a maturity.
+     */
+    public function test_a_refund_that_restores_points_across_an_increment_announces_it(): void
+    {
+        $events = app(NullEventBus::class);
+        $events->forget();
+
+        [$member] = $this->orderWithRedemption();
+
+        $this->refunds->apply(
+            account: $member,
+            shopifyOrderId: self::ORDER,
+            orderEligiblePence: 8000,
+            cumulativeRefundedPence: 2000,
+            shopifyRefundId: 77001,
+        );
+
+        $crossings = array_values(array_filter(
+            $events->emitted(),
+            fn ($event): bool => $event->name === LoyaltyEventName::VOUCHER_INCREMENT_REACHED,
+        ));
+
+        $this->assertCount(1, $crossings, 'Once for the refund, not once per posting.');
+        $this->assertSame(1, $crossings[0]->properties['increments']);
+        $this->assertSame(1, $crossings[0]->properties['increments_gained']);
+        $this->assertSame(500, $crossings[0]->properties['voucher_balance_pence']);
+    }
+
+    /**
+     * The other half, and it needed a matured earn to arrange - which is itself
+     * worth knowing. A refund credits restored redemption points to AVAILABLE
+     * while reversing an unmatured earn debits PENDING, so on the signed-off
+     * worked example a refund moves the available balance UPWARD however large
+     * it is. A fall needs the earn to have matured first.
+     *
+     * Once it does fall, VoucherCrossing stays silent: 300 points down to 220
+     * loses an increment, and `voucher.increment_reached` says a member has
+     * GAINED one, so firing it here would tell them they had five pounds more
+     * at the moment they had less.
+     *
+     * There is deliberately no event for a downward crossing. Adding one is a
+     * decision about the Klaviyo flow set, not a code change - see V20.
+     */
+    public function test_a_refund_that_reduces_the_balance_announces_no_crossing(): void
+    {
+        $member = $this->member();
+
+        // Two increments before the order, so there is voucher value to lose.
+        $this->ledger->post($member, LedgerPosting::openingBalance(
+            points: 220,
+            idempotencyKey: 'open:'.$member->id,
+            occurredAt: now()->subMonths(2),
+            expiresAt: now()->addMonths(4),
+            reason: 'Migrated balance',
+        ));
+
+        $earn = $this->ledger->post($member, LedgerPosting::earn(
+            points: 80,
+            idempotencyKey: 'earn:matured',
+            occurredAt: now()->subDays(40),
+            maturesAt: now()->subDays(10),
+            expiresAt: now()->addDays(172),
+            shopifyOrderId: self::ORDER,
+            qualifyingValuePence: 8000,
+        ));
+
+        $this->ledger->post($member, LedgerPosting::maturity(
+            points: 80,
+            parentEntryId: (int) $earn->id,
+            idempotencyKey: 'mature:'.$earn->id,
+            occurredAt: now()->subDays(10),
+        ));
+
+        $this->assertSame(300, $member->refresh()->points_available);
+        $this->assertSame(1500, $member->voucher_balance_pence, 'Three increments before.');
+
+        $events = app(NullEventBus::class);
+        $events->forget();
+
+        $this->refunds->apply($member, self::ORDER, 8000, 8000, 77004);
+
+        $member->refresh();
+        $this->assertSame(220, $member->points_available, 'The matured 80 came back out.');
+        $this->assertSame(1000, $member->voucher_balance_pence, 'Two increments after: a fall.');
+
+        $this->assertSame(
+            [],
+            array_values(array_filter(
+                $events->emitted(),
+                fn ($event): bool => $event->name === LoyaltyEventName::VOUCHER_INCREMENT_REACHED,
+            )),
+            'A fall is not an increment reached.',
+        );
     }
 }

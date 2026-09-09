@@ -1302,7 +1302,7 @@ implementation and no verification story.**
 
 | Module | Status | Evidence, or what is missing |
 | --- | --- | --- |
-| Ledger, earning, refunds, reversals, maturity, expiry, segmentation | **BUILT AND VERIFIED** | 464 backend tests / 2,088 assertions. C14 fixed and proven by replay against real order `#1002`; `loyalty:verify-ledger` reconciles every cached balance |
+| Ledger, earning, refunds, reversals, maturity, expiry, segmentation | **BUILT AND VERIFIED** | 466 backend tests / 2,097 assertions. C14 fixed and proven by replay against real order `#1002`; `loyalty:verify-ledger` reconciles every cached balance |
 | Voucher engine — the **derived** balance (M4) | **BUILT AND VERIFIED** | `BalanceCalculator::derive()` covers all four boundary cases the plan names (99, 100, 199, 200) plus a negative floor and rule-version independence. Not unit tests alone: the same derivation ran through a real checkout on 2 Sep and rendered "£150 of voucher value" on a real till on 3 Sep |
 | Voucher engine — the **issued reward** (M4) | **NOT BUILT beyond issuance** — [V21, parked pending a briefing] | **The reward lifecycle is a missing state machine, not a missing screen.** `loyalty_rewards` models five states and only `issued` is reachable; `state` is currently decoration. No `RewardStateMachine`, no `ExpireRewardsJob`, no goodwill/cancel/reissue route, and the till cannot redeem an issued reward. Birthday issuance alone exists, and has issued nothing here |
 | Customer balance metafields (M4, V4) | **NOT BUILT** | No `PublishBalanceMetafieldJob`. The writer exists but publishes only a per-redemption quote; `member_status` and `segment` are never published as metafields at all. V4 unvalidated |
@@ -1388,7 +1388,10 @@ arithmetic.
 `MaturitySweep` alone, so a member pushed over £5 by a manual adjustment was
 never told. The sweep behind it found **three silent upward paths and a latent
 fourth**, not one. The crossing rule now lives in `VoucherCrossing` and every
-path shares it. See `DECISIONS.md`.
+production path that can raise the available balance shares it. **A DOWNWARD
+crossing still has no event**, and giving it one needs a sixth event name
+against a proposal that commits to five — recorded, not taken. See
+`DECISIONS.md`.
 
 **V21, parked pending a briefing.** The reward lifecycle. Parked at the
 client-side lead's direction because it overlaps V14: both turn on what a stored

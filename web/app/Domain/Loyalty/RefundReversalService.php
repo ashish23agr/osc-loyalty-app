@@ -34,6 +34,7 @@ final class RefundReversalService
     public function __construct(
         private readonly LedgerService $ledger,
         private readonly BalanceCalculator $balances,
+        private readonly VoucherCrossing $crossings,
     ) {}
 
     /**
@@ -73,6 +74,14 @@ final class RefundReversalService
         );
 
         $entries = [];
+
+        // V20. A refund moves points in both directions in one transaction -
+        // an earn reversal down, and restored redemption points back up - so
+        // the crossing is a fact about the NET, captured either side of the
+        // whole transaction rather than per posting. Restored points can push a
+        // member back over an increment, and while the crossing rule lived
+        // inside MaturitySweep that happened in silence.
+        $before = $this->balances->for($account);
 
         DB::transaction(function () use (
             $account, $earns, $redemption, $sums, $occurredAt,
@@ -122,6 +131,14 @@ final class RefundReversalService
             }
         });
 
+        $after = $this->balances->for($account->refresh());
+
+        // After the commit, never inside it, and once for the refund rather
+        // than once per posting. VoucherCrossing announces only an upward
+        // crossing, so a refund that takes more away than it gives back is
+        // correctly silent here - see the note on downward movement there.
+        $this->crossings->announce($account, $before, $after);
+
         return [
             'reversed' => $sums['reverse'],
             'restored' => $sums['restore'],
@@ -129,7 +146,7 @@ final class RefundReversalService
             'cumulative_restored' => $sums['cumulative_restored'],
             'entries' => $entries,
             'full_refund' => RefundArithmetic::isFullRefund($cumulativeRefundedPence, $orderEligiblePence),
-            'balances' => $this->balances->for($account->refresh()),
+            'balances' => $after,
         ];
     }
 

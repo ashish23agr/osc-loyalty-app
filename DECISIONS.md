@@ -858,7 +858,7 @@ none is silently assumed.
 | **V17** | **The tile discards the reason a request failed**, mapping every error but two to "That search could not be run." — raised 3 Sep 2026 | `OUTSTANDING` — small fix; third time in one day that a swallowed error cost time | Sprint 3 tail |
 | **V18** | **The TILL is a second denominator that V13 could not see** — a US-located till reports `USD` while the shop stays `GBP`, so GBP 50 of points would have discounted $50 and printed "£50.00" — found 3 Sep 2026 | **guard `RESOLVED` 3 Sep 2026** — refusal path verified twice; **success path UNVERIFIED**, no GBP till exists here | Sprint 3 |
 | **V19** | **The tile listens for `onPress` and `onSubmit`, which POS components never emit** — nine buttons, the results list, the step controls and redeem are all inert — found 3 Sep 2026 | `OUTSTANDING` — **BLOCKS SPRINT 3**; steps 9-12 were never reachable | Sprint 3 |
-| **V20** | **`voucher.increment_reached` fired from one code path only** — a member pushed over a five-pound increment by a manual adjustment, or by points restored on a refund, was never told — found 9 Sep 2026 | **`RESOLVED` 9 Sep 2026 for the adjustment path**; the refund-restore path is raised and awaiting a decision | Sprint 3 |
+| **V20** | **`voucher.increment_reached` fired from one code path only** — a member pushed over a five-pound increment by a manual adjustment, or by points restored on a refund, was never told — found 9 Sep 2026 | **`RESOLVED` 9 Sep 2026** — every production path that can raise the available balance now announces. **A downward crossing still has no event and is raised separately** | Sprint 3 |
 | **V21** | **The reward lifecycle is a missing state machine** — `loyalty_rewards` models five states and only `issued` is reachable; no transition to `redeemed`, `expired`, `cancelled` or `superseded` exists anywhere — found 9 Sep 2026 | `PARKED` pending a briefing — **overlaps V14**; both turn on what a stored column is allowed to mean | Sprint 5 gate |
 
 ### V1 — UI layer · `RESOLVED` 2026-08-26, **corrected 2026-08-27**
@@ -1811,8 +1811,8 @@ can move. Four can raise the available balance and therefore cross an increment:
 | --- | --- | --- |
 | `maturity()` | `MaturitySweep` | **announced** |
 | `adjustment()`, available bucket, positive | `AdjustmentService:159` | **silent - V20** |
-| `redemptionRestore()` | `RefundReversalService:100` | **silent - raised, see below** |
-| `openingBalance()` | **no callers** | dormant; becomes a fourth the day the migration importer is written |
+| `redemptionRestore()` | `RefundReversalService:100` | **silent - now announces, see below** |
+| `openingBalance()` | **no production callers** (tests only) | dormant; becomes a fourth the day the migration importer is written |
 
 So this was three instances and a latent fourth, not one.
 
@@ -1836,13 +1836,40 @@ by reintroducing the defect: one failure, naming it. The endpoint is where a
 member's balance actually moves, and a service-level test would have stood where
 this defect could not be seen - the testing principle, fifth instance.
 
-**Left open, and deliberately.** `RefundReversalService` restores redeemed points
-and can net-cross upward, and it is silent. The code fix is the same single call.
-Whether it *should* announce is not a code question: a refund is not a happy
-moment, and "you have another five pounds" arriving alongside one may be wrong
-for reasons that have nothing to do with arithmetic. **Awaiting a decision.**
+**The refund path, decided and closed 9 Sep 2026.** The client-side lead's call:
+announce there too, because a member whose balance changed without being told is
+in the same position whichever way it moved. `RefundReversalService` now
+announces through the same object. A refund moves points in both directions
+inside one transaction - an earn reversal down, restored redemption points up -
+so the crossing is a fact about the **net**, captured either side of the whole
+transaction and announced once for the refund rather than once per posting.
 
-Backend 464 tests / 2,088 assertions, Pint clean.
+**Arranging the test taught us something about refunds that is worth keeping.**
+A refund credits restored redemption points to **available** while reversing an
+unmatured earn debits **pending**. So on the signed-off worked example a refund
+moves the available balance **upward however large it is** - a full £80 refund of
+that order takes the member from two increments to four. A refund only reduces
+the available balance when the earn has already **matured**. That is not a
+defect; it is D9 working as designed, and it means "a refund reduces a balance"
+is the wrong default intuition to reason from.
+
+**A downward crossing has no event, and that is now the open question.** The
+decision above was given as "consistency matters more than which direction it
+moved", and the code cannot honour that as stated:
+`voucher.increment_reached` asserts a member has **gained** an increment, so
+firing it on a fall would tell them they had five pounds more at the exact
+moment they had less. `VoucherCrossing` is therefore upward-only, and the two
+directions are not symmetrical facts wearing different signs - "you have another
+£5" is an offer, "you have £5 less" is a correction, and only one of them is a
+marketing send.
+
+Announcing a fall needs a **sixth event name**, and the proposal commits to five
+(M11). That is a scope decision about the Klaviyo flow set rather than a code
+change, so it is recorded here rather than taken. The downward case is asserted
+as deliberately silent in `RefundReversalTest`, so the behaviour is pinned either
+way and a future decision has a test to change rather than a gap to discover.
+
+Backend 466 tests / 2,097 assertions, Pint clean.
 
 ---
 
@@ -1906,6 +1933,7 @@ shape.
 | 2026-08-26 | C6 mechanism confirmed and answered for the development store (shop owner of `loyalty-system.myshopify.com`). The named person for the live store is pending client confirmation — **ask OSC / Robert**. Sprint 1 unblocked. |
 | 2026-08-26 | Week-zero validations: V1, V3, V5 and V8 all resolved. V5 changed the scope list (`read_discounts` added) and simplified M6 (`functionHandle` removes the `shopifyFunctions` lookup). V3 found and fixed a too-short test secret in `phpunit.xml`. |
 | 2026-08-27 | Sprint 1 API endpoints built. C11 raised: the club card number is derived from the account id rather than stored, pending an OSC position on physical cards. |
+| 2026-09-09 | **V20 closed on the refund path, and a sixth-event question raised in its place.** Decided: announce there too, because a member whose balance changed without being told is in the same position whichever way it moved. `RefundReversalService` announces on the **net** of a refund, once, after the commit. Arranging the test established that **a refund moves the available balance upward however large it is** unless the earn has already matured - restored redemption points credit `available` while an unmatured earn reversal debits `pending` - so a full £80 refund of the worked example takes a member from two increments to four. The instruction as given cannot be honoured literally: `voucher.increment_reached` asserts a gain, so a fall needs a sixth event name and the proposal commits to five (M11). **Recorded, not taken**, with the downward case pinned as deliberately silent. Backend 466/2,097, Pint clean. |
 | 2026-09-09 | **M4 audited against the plan, and two findings raised.** The Voucher and reward engine splits cleanly: the **derived balance is built and genuinely verified** (`derive()` covers all four spec boundary cases, and the same derivation was exercised through a real checkout and rendered on a real till), while the **issued reward is a schema and a birthday job with no lifecycle** - V21. **V20 found and fixed**: `voucher.increment_reached` fired from `MaturitySweep` alone, so a manual adjustment crossing £5 told nobody; the crossing rule now lives in `VoucherCrossing` and both paths share it. The sweep behind it found three silent paths and a latent fourth, not one. **V21 parked pending a briefing**, overlapping V14. Dev-store `loyalty_rewards` confirmed empty, read-only, so V21 is latent rather than live. Backend 464/2,088, Pint clean. |
 | 2026-08-27 | **V1 corrected.** The console shipped rendering as unstyled text: `index.html` loaded `app-bridge.js` only, and the Polaris `s-*` components come from a second script, `polaris.js`. App Bridge registers the `ui-*` elements and reads `s-page` but defines no `s-*`, so the admin navigation worked while every page did not. Both tags are now loaded, with a boot guard and a document test against recurrence. |
 | 2026-08-27 | **Sprint 1 complete.** 16 admin endpoints, each role-guarded and audited; every Sprint 1 screen built (A1–A5, A10, A12) and verified in a browser. Stubbed to their owning sprints: the enrol-member modal (M1, endpoint already built and tested) and every export (Sprint 5 Reports). 209 backend tests / 1,073 assertions and 128 frontend tests, all green. |
