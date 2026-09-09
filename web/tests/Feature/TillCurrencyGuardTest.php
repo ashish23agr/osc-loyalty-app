@@ -13,6 +13,7 @@ use App\Domain\Shop\ShopCurrency;
 use App\Models\LoyaltyAccount;
 use App\Models\Redemption;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Tests\Support\FakeDiscountCodeWriter;
 use Tests\Support\FakeShopCurrency;
 use Tests\TestCase;
@@ -194,5 +195,61 @@ class TillCurrencyGuardTest extends TestCase
 
         $this->assertStringContainsString("'till_currency'", $controller);
         $this->assertStringContainsString('tillCurrency:', $controller);
+    }
+
+    /**
+     * V23. A hold that PASSES must record what it compared.
+     *
+     * The guard consumed the till currency and threw it away, logging only
+     * refusals, so `PC-23502758` - a POS hold that succeeded on a US-addressed
+     * location on 9 Sep 2026 - cannot be explained after the fact. Either the
+     * device reported the location's currency or it reported the shop's, and
+     * those mean opposite things: the first is this guard working, the second is
+     * it duplicating V13 and protecting against nothing.
+     *
+     * Asserted rather than trusted because the value is unrecoverable once the
+     * request has gone: if the line is missing or the key is wrong, the next
+     * real sale answers nothing and the question needs a device diagnostic
+     * again.
+     */
+    public function test_an_accepted_pos_hold_records_the_currency_it_compared(): void
+    {
+        $logged = [];
+
+        Log::listen(function ($message) use (&$logged): void {
+            $logged[] = $message;
+        });
+
+        $held = $this->holdAtTill('GBP');
+
+        $this->assertNotNull($held['redemption'], 'A matching till must be allowed to hold.');
+
+        $accepted = array_values(array_filter(
+            $logged,
+            fn ($m): bool => $m->message === 'POS hold accepted',
+        ));
+
+        $this->assertCount(1, $accepted, 'An accepted POS hold must say what it compared.');
+        $this->assertSame('GBP', $accepted[0]->context['till_currency'], 'The till currency is the whole point.');
+        $this->assertSame('GBP', $accepted[0]->context['rules_currency']);
+        $this->assertSame($held['redemption']->reference, $accepted[0]->context['reference']);
+    }
+
+    /** An online hold has no till, so it must not claim to have compared one. */
+    public function test_an_online_hold_records_no_till_currency(): void
+    {
+        $logged = [];
+
+        Log::listen(function ($message) use (&$logged): void {
+            $logged[] = $message;
+        });
+
+        $this->holdAtTill(null, channel: 'online');
+
+        $this->assertSame(
+            [],
+            array_values(array_filter($logged, fn ($m): bool => $m->message === 'POS hold accepted')),
+            'There is no till in an online checkout.',
+        );
     }
 }

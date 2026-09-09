@@ -297,12 +297,25 @@ class LoyaltyPreflight extends Command
                 .'  id='.basename((string) $node['id']));
         }
 
-        // The till is denominated by its LOCATION's market, not by the shop, so
-        // a GBP hold needs a GB-addressed location. V18 fails closed without one.
+        // Reports the absence and predicts nothing, corrected 9 Sep 2026.
+        //
+        // This line used to read "a POS hold will be refused as
+        // till_currency_mismatch (V18)", on the reasoning that the till is
+        // denominated by its LOCATION's market. `PC-23502758` disproves it: a
+        // POS hold succeeded on the US-addressed location `95318016240`, which
+        // means the device reported GBP and the guard passed. Whether that is
+        // because the POS session reports the SHOP currency rather than the
+        // location's is still open - see V23.
+        //
+        // So the count is stated and the conclusion is not. A diagnostic that
+        // states a wrong conclusion confidently is worse than one that stays
+        // quiet, and this line was an instance of exactly that.
         if ($gb === 0) {
-            $this->line('             <fg=red>No GB-addressed location: a POS hold will be refused as till_currency_mismatch (V18).</>');
+            $this->line('             <fg=yellow>No GB-addressed location on this store.</>');
+            $this->line('             Whether that refuses a POS hold is NOT settled - a hold has succeeded');
+            $this->line('             without one. The till reports its own currency; read it from the log.');
         } else {
-            $this->line('             <fg=green>'.$gb.' GB-addressed location(s) - a GBP till is possible.</>');
+            $this->line('             <fg=green>'.$gb.' GB-addressed location(s).</>');
         }
 
         return true;
@@ -322,9 +335,29 @@ class LoyaltyPreflight extends Command
         $redemption = Redemption::query()->latest('id')->first();
         $this->line('  redemptions      total='.Redemption::query()->count()
             .'  pos='.Redemption::query()->where('channel', 'pos')->count()
+            .'  confirmed='.Redemption::query()->where('state', 'confirmed')->count()
             .'  newest='.($redemption === null
                 ? 'none'
                 : $redemption->reference.' ('.$redemption->channel.'/'.$redemption->state.', id '.$redemption->id.')'));
+
+        // Added 9 Sep 2026. The three numbers a completed sale moves were in
+        // the status half or not reported at all, so "did the sale land" could
+        // not be answered from the watermark alone - which is the one question
+        // it exists to answer. points_consumed in particular was missing
+        // entirely, and it is the figure that separates a hold from a sale.
+        if ($redemption !== null) {
+            $this->line('                   points_consumed='.$redemption->points_consumed
+                .'  order='.($redemption->shopify_order_id ?? 'none')
+                .'  confirmed_at='.($redemption->confirmed_at?->toIso8601String() ?? 'never'));
+        }
+
+        $member = LoyaltyAccount::query()->find((int) $this->option('member'));
+
+        if ($member !== null) {
+            $this->line('  member balance   account '.$member->id
+                .'  available='.$member->points_available.'pts'
+                .'  voucher='.$this->money((int) $member->voucher_balance_pence));
+        }
 
         $entry = LedgerEntry::query()->latest('id')->first();
         $this->line('  ledger entries   total='.LedgerEntry::query()->count()

@@ -272,6 +272,29 @@ final class RedemptionService
 
         $gateway->publish($account, $redemption);
 
+        // V23. The guard consumed the till currency and threw it away, so a POS
+        // hold that PASSED left no record of what it had compared - only a
+        // refusal was logged. `PC-23502758` succeeded on a US-addressed location
+        // on 9 Sep 2026 and there is no way, after the fact, to say whether the
+        // device reported the location's currency or the shop's. Those two
+        // answers mean opposite things: the first is V18 working, the second is
+        // V18 duplicating V13 and offering no protection at all against the
+        // defect it was built for.
+        //
+        // The same shape as the standing testing principle - a value that
+        // production derives and nothing preserves - so the next successful hold
+        // answers it without an on-device diagnostic.
+        if ($channel === 'pos') {
+            Log::info('POS hold accepted', [
+                'reference' => $redemption->reference,
+                'till_currency' => $tillCurrency,
+                'rules_currency' => $rulesCurrency,
+                'shop_currency' => $shopCurrency,
+                'location' => $shopifyLocationId,
+                'amount_pence' => $amount,
+            ]);
+        }
+
         return ['redemption' => $redemption, 'quote' => $quote, 'reason' => null];
     }
 

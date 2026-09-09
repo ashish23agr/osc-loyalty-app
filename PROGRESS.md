@@ -1302,14 +1302,14 @@ implementation and no verification story.**
 
 | Module | Status | Evidence, or what is missing |
 | --- | --- | --- |
-| Ledger, earning, refunds, reversals, maturity, expiry, segmentation | **BUILT AND VERIFIED** | 476 backend tests / 2,135 assertions. C14 fixed and proven by replay against real order `#1002`; `loyalty:verify-ledger` reconciles every cached balance |
+| Ledger, earning, refunds, reversals, maturity, expiry, segmentation | **BUILT AND VERIFIED** | 478 backend tests / 2,141 assertions. C14 fixed and proven by replay against real order `#1002`; `loyalty:verify-ledger` reconciles every cached balance |
 | Voucher engine — the **derived** balance (M4) | **BUILT AND VERIFIED** | `BalanceCalculator::derive()` covers all four boundary cases the plan names (99, 100, 199, 200) plus a negative floor and rule-version independence. Not unit tests alone: the same derivation ran through a real checkout on 2 Sep and rendered "£150 of voucher value" on a real till on 3 Sep |
 | Voucher engine — the **issued reward** (M4) | **NOT BUILT beyond issuance** — [V21, parked pending a briefing] | **The reward lifecycle is a missing state machine, not a missing screen.** `loyalty_rewards` models five states and only `issued` is reachable; `state` is currently decoration. No `RewardStateMachine`, no `ExpireRewardsJob`, no goodwill/cancel/reissue route, and the till cannot redeem an issued reward. Birthday issuance alone exists, and has issued nothing here |
 | Customer balance metafields (M4, V4) | **BUILT, UNVERIFIED** — no live consumer yet | `PublishBalanceMetafieldJob` publishes the standing member position from `BalanceCalculator::refreshCache()`, the single chokepoint, and only when the balance actually moved. **One JSON `member` key rather than plan 6.3's five typed metafields** — a deliberate deviation, since the writer is JSON-only and typed definitions are an install-time concern with no consumer until V11. Never read back by anything: the account page does not exist |
 | Online redemption — single-use discount code | **BUILT AND VERIFIED** | Dev-store script A1–A4 passed 2 Sep 2026: code minted, applied at a real checkout, `state=confirmed`, `points_consumed=1000`, unused quote swept to `void`. The only path fully exercised against a real shop |
 | Admin console | **BUILT, PARTIALLY** | Six real screens — Dashboard, Customers, Member profile, Loyalty, Audit, Settings — and 134 frontend tests. **Three screens are still placeholders: Vouchers, Transactions, Reports.** Read the Vouchers placeholder narrowly: what is missing behind it is the reward state machine (V21), not the screen |
 | POS tile | **BUILT, PARTIALLY VERIFIED** | Steps 1–5 pass 3 Sep 2026: search, tapping through, member screen, steppers. **Redemption has never completed.** Every control in the modal was inert until V19 was fixed the same day |
-| POS redemption success path | **BUILT, UNVERIFIED** — [LIVE ONLY unless a UK location is added, checklist A1–A3] | The V18 guard's refusal path is verified twice; the happy path needs a GBP till and this store has none |
+| POS redemption success path | **BUILT, UNVERIFIED** — [checklist A1–A3, **provable HERE**, no UK location needed] | Corrected 9 Sep 2026. `PC-23502758` is a real POS hold on the US-addressed location `95318016240`, so the device reported GBP and V18's guard passed — a refusal writes no row. Apply, the guard, the steppers, location and staff attribution all reached the server. **Tender → `orders/paid` → confirm → points has never once completed here**, blocked by a 20-minute quote window and an incomplete sale, not by store configuration. See V23: the guard discarded the currency it compared, now logged |
 | Online enrolment | **BUILT, UNVERIFIED** | `POST /api/admin/members` with the D10 duplicate-email check, covered in the suite. Never exercised from a storefront — and there is no storefront |
 | Klaviyo flows | **BUILT AS A SEAM, NOT WIRED** — [LIVE ONLY, checklist B4] | `EventBus` plus `NullEventBus`; all five events emit from real call sites and are dropped. No live driver and no API key |
 | The five reports | **NOT BUILT** — [LIVE ONLY to verify, checklist B3] | `ReportsScreen` is a placeholder and no report endpoints exist. V10 outstanding |
@@ -1629,6 +1629,21 @@ argument for the watermark. It is not recorded as passed.
 **Status unchanged by this entry, deliberately.** A1, V18's success path and the
 POS redemption happy path remain **UNVERIFIED**. The POS tile stays at **BUILT,
 PARTIALLY VERIFIED**.
+
+### The same afternoon produced a real hold, and it overturned an assertion
+
+`PC-23502758` — a genuine POS hold on the US-addressed location `95318016240`,
+found by this very watermark moving from `pos=0` to `pos=1`. It proves Apply
+reaching `hold()`, V18's guard **passing**, the £5 steppers (£50 stepped to
+£25), and location and staff attribution. It also disproves what both of us had
+asserted: that a GB-addressed location was required for a POS hold at all. See
+`DECISIONS.md` → V23, and the corrected section A of the live-store checklist.
+
+It was then never tendered, and `loyalty:expire-quotes` swept it to `void` at
+10:52:59. So the honest position at the end of the day is narrower and more
+useful than "blocked by the store": **the mechanism is unproven here because no
+sale has been completed inside a twenty-minute window** — not because anything
+about this store prevents it.
 
 ---
 
