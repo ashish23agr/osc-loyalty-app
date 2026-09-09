@@ -2177,6 +2177,39 @@ would otherwise believe a foreign till is caught.
 
 ---
 
+### V24's demonstration was attempted and did not land · 2026-09-09
+
+Recorded so that V24 is not later read as observed. `PC-46033088` was held at the
+Canadian location for £10, and a sale was attempted against it in order to read
+the order's own `presentmentMoney.currencyCode` - which would have shown 200
+sterling-denominated points spent on a ten-DOLLAR discount, turning the
+server-side fix from an argument into a fact.
+
+**No order was created.** The hold stayed `quoted`, `points_consumed` stayed 0,
+account 10 stayed at 3000 points and £150, no ledger entry was written, no
+`orders/paid` arrived, and Shopify's newest order remained `#1002` from
+2 September with `retailLocation: null`. The queue was empty throughout, so no
+worker was involved.
+
+**So V24 rests on the API surface, not on an observation.**
+`applyCartDiscount(type, title, amount?)` takes a bare string with no currency
+parameter, which is sufficient to establish that the till denominates - but the
+financial consequence has not been seen happening. It must not be written up as
+though it has.
+
+**The blocker this leaves is bigger than V24.** Three tenders were attempted on
+9 Sep 2026 and none produced an order on Shopify, while two holds reached the
+app perfectly. **Completing a POS sale on this device is therefore the single
+blocker on the entire POS mechanism**, ahead of every currency question, and it
+is a device or workflow problem rather than a code one. Candidates not yet
+eliminated: the tender not being carried to completion; POS queueing the sale
+offline for later sync (which is section D's subject, C7, and would make the
+missing order correct behaviour rather than a fault); and a device signed into a
+different store, which the two successful holds argue against but only as of the
+moment they were made.
+
+---
+
 ### The enrolment path executed for the first time · 2026-09-09
 
 Recorded because the 9 Sep audit had it as **BUILT, UNVERIFIED** and it has now
@@ -2213,6 +2246,13 @@ the message alone finds the wrong one:
 ```bash
 grep "development.*POS hold" web/storage/logs/laravel.log | tail -3
 ```
+
+**Five of the day's six variants made something look fine; this one made
+something look broken.** That is the useful distinction, and the root cause is
+the same in both directions: **an instrument trusted beyond what it could see.**
+Hiding a failure and inventing one are symmetrical consequences of the same
+error, and the inventing kind is not the safer half - it would have retired a
+correct result.
 
 **The absence of `local.INFO` lines was NOT a log-level problem.** `LOG_LEVEL` is
 `debug` and nothing is filtered. It was a wrong filter: an instruction to grep
