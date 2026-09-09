@@ -2066,6 +2066,16 @@ than the three fixes:
    GB-addressed location: a POS hold will be refused as `till_currency_mismatch`
    (V18)"* while a successful POS hold sat in its own watermark four lines below.
 
+**A fourth variant, and it unifies them more sharply than the first framing did:
+in every case the system knew something useful and discarded it.** The 403 knew
+the staff id and returned a message without it (V22). The guard knew the till
+currency it had compared and logged it only on refusal (V23). The tile knew the
+server's own reason and replaced it with a generic string (V17). And the
+prediction table knew what a pass would look like, which is the same failure
+inverted — the useful thing was preserved so well that it could be mistaken for
+an observation. **Discarding what you derived and asserting past what you kept
+are the same mistake pointed in opposite directions.**
+
 **The rule: a diagnostic that states a wrong conclusion confidently is worse than
 one that stays quiet.** Each of these was a tool sounding more certain than it had
 earned, and in every case the confident wrong answer cost more than silence would
