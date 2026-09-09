@@ -1308,7 +1308,7 @@ implementation and no verification story.**
 | Customer balance metafields (M4, V4) | **BUILT, UNVERIFIED** — no live consumer yet | `PublishBalanceMetafieldJob` publishes the standing member position from `BalanceCalculator::refreshCache()`, the single chokepoint, and only when the balance actually moved. **One JSON `member` key rather than plan 6.3's five typed metafields** — a deliberate deviation, since the writer is JSON-only and typed definitions are an install-time concern with no consumer until V11. Never read back by anything: the account page does not exist |
 | Online redemption — single-use discount code | **BUILT AND VERIFIED** | Dev-store script A1–A4 passed 2 Sep 2026: code minted, applied at a real checkout, `state=confirmed`, `points_consumed=1000`, unused quote swept to `void`. The only path fully exercised against a real shop |
 | Admin console | **BUILT, PARTIALLY** | Six real screens — Dashboard, Customers, Member profile, Loyalty, Audit, Settings — and 134 frontend tests. **Three screens are still placeholders: Vouchers, Transactions, Reports.** Read the Vouchers placeholder narrowly: what is missing behind it is the reward state machine (V21), not the screen |
-| POS tile | **BUILT, PARTIALLY VERIFIED** | Steps 1–5 pass 3 Sep 2026: search, tapping through, member screen, steppers. **Redemption has never completed.** Every control in the modal was inert until V19 was fixed the same day |
+| POS tile | **BUILT, PARTIALLY VERIFIED** — the offline state (C7) now has real evidence, 9 Sep 2026 | Steps 1–5 pass 3 Sep 2026: search, tapping through, member screen, steppers. **Redemption has never completed.** Every control in the modal was inert until V19 was fixed the same day |
 | POS redemption success path | **BUILT, UNVERIFIED** — [checklist A1–A3, **provable HERE**, no UK location needed; **V18's guard is WITHDRAWN**, see V24] | Corrected 9 Sep 2026. `PC-23502758` is a real POS hold on the US-addressed location `95318016240`, so the device reported GBP and V18's guard passed — a refusal writes no row. Apply, the guard, the steppers, location and staff attribution all reached the server. **Tender → `orders/paid` → confirm → points has never once completed here**, blocked by a 20-minute quote window and an incomplete sale, not by store configuration. See V23: the guard discarded the currency it compared, now logged |
 | Online enrolment | **BUILT, PARTIALLY VERIFIED** | `POST /api/admin/members` with the D10 duplicate-email check. **Executed against a real store 9 Sep 2026** — accounts 12 and 13, `enrolment_channel: admin`, both emitting `member.enrolled`, both MD1 members with no Shopify customer. Still never exercised from a storefront — and there is no storefront |
 | Klaviyo flows | **BUILT AS A SEAM, NOT WIRED** — [LIVE ONLY, checklist B4] | `EventBus` plus `NullEventBus`; all five events emit from real call sites and are dropped. No live driver and no API key |
@@ -1552,6 +1552,73 @@ kind of failure that would have produced wrong rule values with no error. And
 saving rules on a shop with no baseline made the user's save version 1 dated
 *now*, so events predating it resolved to the new values: a rule change applying
 retrospectively, which is exactly what the versioning exists to prevent.
+
+---
+
+## Close of day — 9 September 2026
+
+### The afternoon has one explanation, and it is not a defect
+
+**The POS device was offline.** Three tenders were attempted and none produced an
+order on Shopify, while two holds reached the app perfectly. POS queued those
+sales locally, which is what it is designed to do, so **the missing orders are
+correct behaviour rather than a fault** — and it is **section D (C7) evidence**,
+the offline state that had never been exercised.
+
+**It explains the whole afternoon at once.** Nothing was ever going to reach
+`orders/paid` while the device was offline, however promptly a sale was tendered.
+The twenty-minute quote window was never the binding constraint; it looked like
+it because a quote lapsing is what a stalled sale leaves behind. Every reading
+that treated the missing order as a sequencing failure was wrong for the same
+reason.
+
+**What that retrospectively confirms.** The tile reaching the app while the
+device could not complete a sale is exactly the split C7 predicts: reads and
+holds are HTTP calls to us that succeeded, and order creation is Shopify's own
+sync, which did not. Two holds landing cleanly is evidence *for* the offline
+diagnosis, not against it.
+
+### Today's biggest correction, stated plainly
+
+**A1–A3 were never blocked by this store's configuration.** They were recorded
+during the afternoon as blocked by the merchant establishment being locked to the
+US, and **that was wrong.** The claim came from an inference — that a POS till is
+denominated by the market matching its location's country, so a GBP till needs a
+GB-addressed location — which `PC-23502758` and `PC-46033088` both disprove: two
+holds succeeded on US and Canadian locations respectively, and both reported
+`GBP`. **The development store can settle A1–A3.** What actually blocked them was
+an offline device.
+
+The establishment lock is real and does block V12, VAT presentation and the rest
+of section B. It never touched A1–A3, and conflating the two produced a
+permanently-blocked verdict on work that is a single online sale away.
+
+### V24 is reasoned, not observed — and must not drift
+
+`PC-46033088` was held at the Canadian location specifically so the resulting
+order's `presentmentMoney.currencyCode` could be read. **The tender produced no
+order, so there was no `presentmentMoney` to read.** V24 therefore rests entirely
+on the API surface — `applyCartDiscount(type, title, amount?)` takes a bare
+string with no currency parameter, so the till denominates — which is enough to
+establish the mechanism and **not** enough to claim the financial consequence has
+been seen.
+
+**Do not let tomorrow's summary record V24 as demonstrated.** It is raised,
+argued from the type signature, and unobserved.
+
+### The hole that keeps losing to whatever is most debuggable
+
+**Everything customer-facing still does not exist**, and it has now had **no
+sprint time across two full days of POS work**. No customer account extension, no
+storefront surface, no route by which a member can see their own balance, points
+history, vouchers or expiry warnings. Roughly half the programme's value.
+
+It is not losing on merit. It is losing because POS produces a specific, tractable
+defect every few hours and a customer-facing gap produces none — **the most
+immediately debuggable thing wins every time it is allowed to compete.** V11 was
+never spiked, C1 is blocked on OSC, and no sprint has been planned that builds
+any of it. This is what the client will react to, and it should be scheduled
+before it is prioritised, not after.
 
 ---
 

@@ -2197,16 +2197,20 @@ parameter, which is sufficient to establish that the till denominates - but the
 financial consequence has not been seen happening. It must not be written up as
 though it has.
 
-**The blocker this leaves is bigger than V24.** Three tenders were attempted on
-9 Sep 2026 and none produced an order on Shopify, while two holds reached the
-app perfectly. **Completing a POS sale on this device is therefore the single
-blocker on the entire POS mechanism**, ahead of every currency question, and it
-is a device or workflow problem rather than a code one. Candidates not yet
-eliminated: the tender not being carried to completion; POS queueing the sale
-offline for later sync (which is section D's subject, C7, and would make the
-missing order correct behaviour rather than a fault); and a device signed into a
-different store, which the two successful holds argue against but only as of the
-moment they were made.
+**ANSWERED the same evening: the device was offline.** Three tenders were
+attempted on 9 Sep 2026 and none produced an order, while two holds reached the
+app perfectly - and that split is exactly what C7 predicts. Reads and holds are
+HTTP calls to us, which succeeded; order creation is Shopify's own sync, which
+did not. POS queued the sales locally, so **the missing orders are correct
+behaviour rather than a fault, and this is section D (C7) evidence** for a state
+that had never been exercised.
+
+It also explains the whole afternoon at once: **nothing was ever going to reach
+`orders/paid` while the device was offline, however promptly a sale was
+tendered.** The twenty-minute quote window was never the binding constraint - it
+only looked that way because a lapsed quote is what a stalled sale leaves
+behind. Every reading that treated a missing order as a sequencing failure was
+wrong for the same reason, including the guidance to tender faster.
 
 ---
 
