@@ -1555,6 +1555,88 @@ retrospectively, which is exactly what the versioning exists to prevent.
 
 ---
 
+## Tomorrow — 10 September 2026, with a written time-box
+
+### 1. One uninterrupted POS sale · **TIME-BOXED TO 30 MINUTES**
+
+**The box is a rule, not advice.** Start the clock when the device is confirmed
+online. If the sale has not reached `state=confirmed` with `points_consumed=200`
+within **thirty minutes**, then:
+
+- **A1–A3 move to Section B**, marked as needing OSC's store, and
+- **customer-facing work starts regardless**, that morning, not after "one more
+  attempt".
+
+**Why this is written down rather than intended.** Two full days have gone to
+POS. The reason is structural, not a failure of discipline: **POS yields a
+specific, tractable defect every few hours and a missing customer surface yields
+none**, so in the moment the next POS defect always looks five minutes from
+resolution — and it usually is, and there is always another one behind it. Four
+defects on 3 Sep, four more on 9 Sep, every one of them genuinely worth fixing.
+A time-box is the only mechanism that stops a sequence of individually correct
+decisions from consuming a third day.
+
+**Preconditions, all cheap, all before the clock starts:** no offline banner in
+POS; the device signed into `loyalty-system.myshopify.com`; `loyalty:preflight`
+run to capture the watermark; the cart built and the payment ready **before**
+Apply is pressed.
+
+**Expected, for £10 against account 10** — do not re-derive these at the till:
+`state=confirmed`, `points_consumed=200`, available 3000 → **2800**, voucher
+£150 → **£140** (`voucher_balance_pence` 15000 → 14000), one `redemption` ledger
+entry with `available_delta=-200`, and an `orders/paid` row in `webhook_events`
+reaching `processed`. `pending` will rise above 550, because the sale earns too.
+
+### 2. Customer-facing: the V11 spike, with its failure condition named FIRST
+
+**The spike question:** does a customer account UI extension deploy and render
+under `use_legacy_install_flow`?
+
+**The rule for this spike:** *"the whole plan for half the programme changes"*
+must be followed by *"and here is what it changes to"* — otherwise the spike
+converts one unknown into a larger one. So the fallback ladder is written down
+**before** any time is spent, in preference order:
+
+| | Route | What it needs | Known risk |
+| --- | --- | --- | --- |
+| **A** | **Customer account UI extension** (the plan) | Deployability under the legacy install flow — the V11 question | Unknown. Note that the POS UI extension and the discount function both deploy fine under this flag, and what the flag actually rejected was **webhook subscriptions in the toml**, so the precedent is mildly encouraging |
+| **B** | **App proxy page** — a storefront URL such as `/apps/privilege-club` proxied to Laravel | An `[app_proxy]` block in `shopify.app.toml`; renders inside the live theme | Strongest fallback: the proxy passes **`logged_in_customer_id`**, which is exactly the authenticated identity a member needs to see their own balance. No extension framework involved at all |
+| **C** | **Theme app extension** — an app block reading the customer metafield | Storefront read access on the metafield | `PublishBalanceMetafieldJob`, built 9 Sep 2026, already publishes the standing member position, so the data is there. **The specific unknown is access**: our metafields are app-owned in the app-reserved namespace with no definitions created, so storefront visibility is not yet granted |
+| **D** | **Plain Liquid** reading the same metafield, no app surface at all | The same storefront access as C | Cheapest possible route and the weakest UX. Worth knowing it exists as a floor |
+
+**So the spike's failure condition is: if A does not deploy, go to B.** B does not
+depend on A, is not affected by the legacy install flow, and carries the
+authenticated customer identity natively. **The spike cannot leave us with
+nothing**, and that is the point of writing the ladder first.
+
+**A finding worth carrying forward:** today's metafield publisher is
+**load-bearing for routes C and D**, which were not why it was built. If the
+spike lands on C, the storefront-access question on an app-reserved namespace is
+the next thing to settle, not the rendering.
+
+### 3. V21's briefing
+
+The reward lifecycle, overlapping V14 — both turn on what a stored column is
+allowed to mean. It is the only item waiting on a decision rather than on
+evidence, and it gates Sprint 5's reporting design. See `DECISIONS.md` → V21.
+
+V24's fix comes after these three. OSC being UK-only makes it a correctness gap
+rather than a launch gate, and the direction indicated is a server-side check on
+the order rather than another device-reported guard.
+
+### Flagged, unidentified: an admin message worth chasing before it becomes a wall
+
+Shopify's admin displayed **"This feature isn't currently available for your
+store"** on 9 Sep 2026, on a screen not yet identified. **Identify what it
+applies to before starting anything that might depend on it.** Recorded because
+so much of 9 Sep turned on development-store limitations discovered mid-task —
+the locked merchant address, the location country field, POS Pro assignment — and
+each cost more found late than it would have found early. A message of that form
+is a limitation announcing itself; it is cheaper to read it now than to hit it
+tomorrow afternoon.
+
+---
+
 ## Close of day — 9 September 2026
 
 ### The afternoon has one explanation, and it is not a defect
