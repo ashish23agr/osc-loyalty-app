@@ -4,7 +4,10 @@ Running record of what is built, verified and outstanding. Companion to
 [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) (the build design) and
 [DECISIONS.md](DECISIONS.md) (the decision register).
 
-**Last updated:** 2026-09-02
+**Last updated:** 2026-09-10 — documentation sync against the internal status
+review of 9 Sep 2026 (`docs/STATUS_INTERNAL.md`). No application code changed.
+See **Documentation sync — 10 September 2026** at the foot of this file for what
+moved and why.
 
 > ### Picking this up cold
 >
@@ -166,11 +169,11 @@ The single-use discount code gateway is written and green; nothing is released.
 | | |
 | --- | --- |
 | **Current phase** | **Sprint 3 — dev-store script in progress, and its scope has grown.** V4, V6a and V7 resolved by spike; ladder green on both sides; discount function, gateway, POS endpoints, POS tile, `orders/paid` confirmation and quote expiry all built. **Script steps A1–A2 run on 1–2 Sep 2026: A2 passed and closed V6a's last unverified element; A1 failed on a plan constraint that revised D5.** A **code-based redemption gateway** is now Sprint 3 work |
-| **Test suite** | Backend **426 / 1,978** · Console **134** · Discount function **43** (25 ladder + 18 against real compiled Wasm) · POS tile **31** — all passing. Backend green on MySQL 8.4 as well as SQLite |
+| **Test suite** | Backend **426 / 1,978** · Console **134** · Discount function **43** (25 ladder + 18 against real compiled Wasm) · POS tile **31** — all passing at the date of this row (2 Sep 2026). **Later counts appear elsewhere in this file (438, 445, 453, 464, 466, 476, 478) and none supersedes another: each is a snapshot on its own date, and data providers inflate the totals. No single current figure is stated, and none of these numbers is verification of anything** |
 | **Schema** | 15 loyalty tables, applied to MySQL 8.4 and verified on SQLite. One Sprint 2 migration: release allocations and reversal tracking |
 | **API** | 19 admin endpoints, each guarded, audited and tested · 4 business webhook topics, fast-acknowledged and queued · 6 scheduled commands |
-| **Console** | 7 screens built (A1–A5, A10, A12), browser-verified; 3 stubbed, all owned by later sprints |
-| **Blocking** | **C1** blocks the end of Sprint 3 (the storefront control). **C6 (live)** blocks go-live. Four deployment requirements code cannot supply — cron, queue worker, scopes, real app URL — are in the README and on the go-live checklist |
+| **Console** | 7 screens built (A1–A5, A10, A12), browser-verified 27 Aug 2026. **Corrected 10 Sep 2026: four agreed console areas are absent, not three** — A6 Vouchers, A7 Transactions, A8 Reports and **A9 Migration**, the last with no route and no navigation entry at all — plus the staff-roles screen, the enrol-member modal, the Settings Klaviyo tab and every export |
+| **Blocking** | **C1** blocks the end of Sprint 3 (the storefront control). **Go-live is gated by more than C6 (live):** **V12** (the tax-inclusive earn base, unproved), **V16** (every till user but the first gets `403 no_role_assigned`), **C14** (the earn base is built to our call and unconfirmed), **C5** (live currency and reporting timezone), **C6 (live)**, and the five unbuilt areas — reports, migration, customer-facing, Klaviyo and the POS happy path. Four deployment requirements code cannot supply — cron, queue worker, scopes, real app URL — are in the README and on the go-live checklist |
 
 ---
 
@@ -1271,6 +1274,21 @@ Requested before sprint planning. Three states only: **BUILT AND VERIFIED**,
 OSC's live store it is marked **[LIVE ONLY]** with the checklist reference, so
 this does not read greener than the evidence supports.
 
+> **The definition of VERIFIED, restated 10 Sep 2026 and now applied to this
+> table.** A module is **BUILT AND VERIFIED** only where every committed
+> behaviour in it has been proved against the real Shopify behaviour it depends
+> on — a real order, a real refund, a real customer, a real checkout, a real
+> webhook delivery, a real POS session, a real discount code, a real Admin API
+> call. **Passing tests, fixtures, mocks, compiled-Wasm suites, local arithmetic
+> and code review do not count.** Where only part of a module's behaviour is
+> proved, the module is **BUILT, UNVERIFIED** and the proved half is named.
+> **Two rows below were corrected against this rule on 10 Sep 2026.** Refunds,
+> reversals, maturity, expiry and segmentation were carried as verified on the
+> strength of the suite plus the C14 replay, and the C14 replay is an earn
+> correction, not a refund. **Points earning** was carried as verified on the
+> strength of one real tax-**exclusive** order, when the branch that ships at
+> OSC is the tax-inclusive one that has never run (V12).
+
 **Read the artificiality entry in `DECISIONS.md` alongside this.** Every
 "verified" below except the ledger arithmetic was verified against a development
 store whose merchant address is locked to the US and whose currency configuration
@@ -1302,7 +1320,9 @@ implementation and no verification story.**
 
 | Module | Status | Evidence, or what is missing |
 | --- | --- | --- |
-| Ledger, earning, refunds, reversals, maturity, expiry, segmentation | **BUILT AND VERIFIED** | 478 backend tests / 2,141 assertions. C14 fixed and proven by replay against real order `#1002`; `loyalty:verify-ledger` reconciles every cached balance |
+| Ledger, rules engine and balance derivation | **BUILT AND VERIFIED** | Real paid order `#1002` posted through a real `orders/paid` delivery; the C14 defect was found *by* that order, fixed, and corrected by `loyalty:replay-orders`, so the compensating-entry mechanism is proved on real data. `loyalty:verify-ledger` reconciles every cached balance and exits non-zero on drift |
+| Points earning (M3) | **BUILT, UNVERIFIED** — **corrected 10 Sep 2026** | **The verified half, named:** order `#1002` earned correctly on the **tax-exclusive** branch, against a real order and a real webhook. **The branch that ships at OSC is the other one.** `gross − allocations − tax` has never run against a real VAT-inclusive discounted order — **V12**, a hard go-live gate. Partly proved means unverified, per the rule above; it was carried inside the verified row until 10 Sep 2026 |
+| Refunds, reversals, maturity, expiry, segmentation | **BUILT, UNVERIFIED** — **corrected 10 Sep 2026** | **These were folded into the row above as BUILT AND VERIFIED on the strength of 478 backend tests plus the C14 replay, and both were the wrong evidence — the C14 replay is an earn correction, not a refund.** No real Shopify refund or cancellation has ever been processed: `refunds/create` and `orders/cancelled` have never been delivered, and the newest `webhook_events` row is the `orders/paid` of 2 Sep 12:54:37 (**V25**). No sweep has ever run on a real shop with real consequence, because there is no `schedule:run` cron on this machine (**V26**). D9 and D9a–D9d, `MaturitySweep`, `ExpirySweep`, `BirthdaySweep` and `SegmentSweep` are evidenced by the suite alone. The arithmetic is not in doubt; the plumbing has never been exercised |
 | Voucher engine — the **derived** balance (M4) | **BUILT AND VERIFIED** | `BalanceCalculator::derive()` covers all four boundary cases the plan names (99, 100, 199, 200) plus a negative floor and rule-version independence. Not unit tests alone: the same derivation ran through a real checkout on 2 Sep and rendered "£150 of voucher value" on a real till on 3 Sep |
 | Voucher engine — the **issued reward** (M4) | **NOT BUILT beyond issuance** — [V21, parked pending a briefing] | **The reward lifecycle is a missing state machine, not a missing screen.** `loyalty_rewards` models five states and only `issued` is reachable; `state` is currently decoration. No `RewardStateMachine`, no `ExpireRewardsJob`, no goodwill/cancel/reissue route, and the till cannot redeem an issued reward. Birthday issuance alone exists, and has issued nothing here |
 | Customer balance metafields (M4, V4) | **BUILT, UNVERIFIED** — no live consumer yet | `PublishBalanceMetafieldJob` publishes the standing member position from `BalanceCalculator::refreshCache()`, the single chokepoint, and only when the balance actually moved. **One JSON `member` key rather than plan 6.3's five typed metafields** — a deliberate deviation, since the writer is JSON-only and typed definitions are an install-time concern with no consumer until V11. Never read back by anything: the account page does not exist |
@@ -1377,10 +1397,10 @@ arithmetic.
 | **`RewardsController`** | **NOT BUILT** | No `POST /api/admin/rewards`, `/cancel` or `/reissue` |
 | **`IssueGoodwillModal`, `CancelRewardModal`, `ReissueRewardAction`** | **NOT BUILT** | `MemberProfileScreen.jsx:114` is a hardcoded `<s-button disabled>Issue voucher</s-button>`; `VouchersScreen` is a placeholder |
 | **Redeeming an issued reward** | **NOT BUILT** | `app/Domain/Redemption/` never references `Reward`. M4 says the till "may redeem either"; it can only redeem the derived balance. `Redemption.reward_id` exists and nothing sets it |
-| **`PublishBalanceMetafieldJob` / V4** | **NOT BUILT** | `DiscountFunctionGateway.php:67` publishes a per-redemption quote only. Nothing publishes a standing customer-level `voucher_balance_pence`, and `member_status` and `segment` are never published as metafields at all |
+| **`PublishBalanceMetafieldJob` / V4** | **BUILT, UNVERIFIED** — **corrected 10 Sep 2026** | **This row said NOT BUILT and was wrong by the end of the same day: the job was built on 9 Sep 2026 and the row was never updated.** `web/app/Jobs/PublishBalanceMetafieldJob.php` publishes the standing member position from `BalanceCalculator::refreshCache()` — the single chokepoint — and only when the balance actually moved; `tests/Feature/BalanceMetafieldPublishTest.php` covers it. It writes **one JSON `member` key** rather than plan §6.3's five typed metafields, a deliberate deviation. **UNVERIFIED in the strict sense: nothing has ever read it back**, because no customer-facing surface exists. What remains true from the original row is that `member_status` and `segment` are not separately published |
 | M4's two events | **BUILT AS A SEAM** | `VOUCHER_INCREMENT_REACHED` and `BIRTHDAY_REWARD_ISSUED`, both dropped into `NullEventBus`. The first fired from one path only until V20 |
-| Test: expiry reduces the balance without touching a reward row | **NOT WRITTEN** | — |
-| Test: metafield published once per balance change | **NOT WRITTEN** | Nothing to assert against |
+| Test: expiry reduces the balance without touching a reward row | **WRITTEN** — corrected 10 Sep 2026 | `BalanceMetafieldPublishTest::test_an_expiry_reduces_the_derived_balance_without_touching_a_reward_row` |
+| Test: metafield published once per balance change | **WRITTEN** — corrected 10 Sep 2026 | `BalanceMetafieldPublishTest` asserts the publish on a move, and no republish where the balance did not move or the earn landed in pending. Suite evidence only — nothing has read the metafield back from Shopify |
 
 ### The two findings this audit raised
 
@@ -1415,6 +1435,14 @@ first kind's clothes.
 **This is the most important distinction in the handover.** 413 backend tests
 pass and every extension suite is green, and none of that proves the plumbing
 between Shopify and this app.
+
+*On the numbers themselves, noted 10 Sep 2026:* several different backend
+counts appear across this file — 413, 426, 438, 445, 453, 464, 466, 476, 478 —
+each correct on the day it was written and none of them current. **No single
+figure is stated deliberately.** A direct count of test methods is lower than
+the reported totals, because data providers inflate them. **None of these
+numbers should be quoted to the client as evidence of anything**, which is the
+whole point of the distinction this section draws.
 
 ### Green in the suites (no shop involved)
 
@@ -1482,12 +1510,24 @@ Everything currently waiting on someone outside the build.
 | **D8** | The redemption ladder order — **`ASSUMED`, client notified 27 Aug 2026** | Nothing. Open to an **objection**, not waiting on an approval | OSC |
 | **D3, D9 (+D9a–D9d)** | Earn base, and the proportional refund rule — same `ASSUMED` posture | Nothing | OSC |
 | **C2, C10, C11** | Below-zero clawback, adjusted-point expiry, club card numbering — all `ASSUMED` and built | Nothing | OSC |
-| **C3, C9** | Full-price-only qualification; adjustments and overrides at the till | Not built, and deliberately so | OSC |
+| **C3, C9** | Full-price-only qualification; adjustments and overrides at the till | Not built, and deliberately so. **Ask C9 alongside V16** | OSC |
+| **C14** · `PENDING` | **Added 10 Sep 2026 — this table omitted it.** Does a Privilege Club voucher reduce the points earned on that order? Our call is yes: £550 of a £600 basket earns 550 | **Go-live.** The code is built to "yes" (fixed 3 Sep 2026), but this is **`PENDING`, not `ASSUMED` and not confirmed** — it needs an explicit answer from Robert, and silence does not close it. A wrong earn base is invisible and compounds | **Robert — answer required** |
+| **C5** | **Added 10 Sep 2026 — this table omitted it.** The live store's currency and reporting timezone | **Go-live, for reporting correctness.** A fact about OSC's store rather than a decision | OSC |
+| **C8** | **Added 10 Sep 2026.** PDF export approach — fidelity against a server dependency | Shapes M12. We recommend a pure-PHP renderer; a headless-browser one puts Chromium on the production box | OSC |
+| **C15** | **New, raised 9 Sep 2026.** Is a member told when a refund reduces their balance? All five committed events announce good news | The Klaviyo flow set. A sixth event name against a proposal that commits to five — recorded, not taken | OSC |
+| **C16** | **New, raised 9 Sep 2026 by the internal status review.** The agreed UI shows individual voucher objects with codes and expiry dates on A6 and UI C2; **D1 removed that object** | **A6 and UI C2 both, before either is designed.** Whatever is built will look materially different from the layouts OSC signed off. **Needs Robert / OSC confirmation** — D1 settles what the system does, not what the client agreed to see | Robert / OSC |
 | ~~**D7**~~ | `read_all_orders` — **approved by Shopify 1 Sep 2026** | Nothing, and nothing was ever blocked. Adding the scope costs one re-authorisation, deferred until the Sprint 3 dev-store run is finished | — |
 
 **The `ASSUMED` items are not blockers.** Each was built to its recommendation
-and the client told which way; silence is a decision, not a delay. Only **C1**
-blocks work, and only **C6 (live)** blocks go-live.
+and the client told which way; silence is a decision, not a delay.
+
+**Corrected 10 Sep 2026.** This section previously ended *"Only C1 blocks work,
+and only C6 (live) blocks go-live"*, and both halves understated it. **C1 blocks
+the storefront control**, which is the only substantial Sprint 3 build left —
+but **go-live is gated by C14, C5 and C6 (live) on the client side**, and by
+V12, V16 and five unbuilt areas on ours. `DECISIONS.md` §3 is the authoritative
+list of what OSC still owes an answer on; this table is its working subset and
+had been missing C14, C5 and C8 outright.
 
 ---
 
@@ -1827,6 +1867,73 @@ tunnel change, and confirm no topic reads `[stale]` before trusting any result
 that depends on one.** A dead queue worker presents the same way (see
 Environment notes), which means "the points never arrived" has at least two
 silent causes and both must be ruled out before it is treated as a defect.
+
+## Documentation sync — 10 September 2026
+
+`PROGRESS.md` and `DECISIONS.md` were reconciled against
+`docs/STATUS_INTERNAL.md`, the evidence-based internal status review of 9 Sep
+2026. **No application code was touched, no feature was started, and nothing
+unresolved was closed.** Every correction below moves the written record toward
+the evidence; none of them moves the build.
+
+**The verification rule now applied in both files.** Built and Verified means
+proved against the real Shopify behaviour the module depends on — a real order,
+refund, customer, checkout, webhook delivery, POS session, discount code or
+Admin API call. **Tests, fixtures, mocks, compiled-Wasm suites, local arithmetic
+and code review do not count.** A defect whose repair exists in the codebase is
+recorded as `FIXED IN CODE`, which is deliberately a weaker claim than
+`RESOLVED`.
+
+**Corrected in `PROGRESS.md`:**
+
+- The 3 Sep audit's single **BUILT AND VERIFIED** row covering *"ledger,
+  earning, refunds, reversals, maturity, expiry, segmentation"* is **split in
+  three**. Ledger, rules engine and balance derivation keep that status on
+  real-order evidence. **Refunds, reversals, maturity, expiry and segmentation
+  are now BUILT, UNVERIFIED** — no real refund or cancellation has ever been
+  delivered, and no sweep has ever run on a real shop. **Points earning is now
+  BUILT, UNVERIFIED** too: only the tax-exclusive branch has ever run, and the
+  tax-inclusive branch is the one that ships (V12).
+- The M4 audit row calling `PublishBalanceMetafieldJob` **NOT BUILT** is
+  corrected to **BUILT, UNVERIFIED**: the job was written later the same day and
+  the row was never updated. Its two "not written" test rows are corrected as
+  written.
+- The header fact table: the console has **four** absent agreed areas, not
+  three; the go-live blocking line no longer reads as C6 (live) alone; and the
+  test-count row now says plainly that the several counts in this file are
+  dated snapshots and none of them is verification.
+- **Open client items** gains **C14**, **C5** and **C8**, which it had omitted
+  while `DECISIONS.md` carried them, plus the two new questions below.
+
+**Corrected in `DECISIONS.md`:**
+
+- **V13**, **V17** and **V19** were `OUTSTANDING` — V19 as *BLOCKS SPRINT 3* —
+  and all three have been fixed in the codebase since **3 Sep 2026**. Verified
+  by reading the code, not by trusting the review. V19's fix additionally has
+  **real device evidence** from the two POS holds of 9 Sep.
+- **V23** is `ANSWERED`, by the Canada hold `PC-46033088`: `session.currency`
+  reports the **shop's** currency. Answered, not fixed — the defect V18 was
+  built for stays uncovered as **V24**.
+- **C14** promoted to a full entry and added to §3; **C5** marked as a go-live
+  item; §1's *"Two items"* framing corrected against §3.
+- **New client questions: C15** (does a member hear about a balance that went
+  down?) and **C16** (individual voucher objects on A6 and UI C2 against D1 —
+  **requires Robert / OSC confirmation before either screen is designed**), with
+  Q6 and Q7 mapped to them. **New validations: V25** (no real refund or
+  cancellation), **V26** (no sweep has run on a real shop) and **V27** (the
+  unidentified admin limitation message).
+
+**Left open, deliberately.** V2, V6, V9, V10, V11, V12, V14, V15, V16, V21,
+V24, C1, C3, C8, C9, C10, C11, C15, C16, the V7 residual and every OSC
+receivable stand exactly as they were. **The A6 / UI C2 conflict is recorded as
+needing Robert / OSC, not as decided by D1.**
+
+**Not touched:** `IMPLEMENTATION_PLAN.md`, whose §12 readiness checklist, §2.4
+namespace list, §5.3 endpoint count, §6.3 metafield shape and M1 webhook claim
+the review also found stale. Those corrections were out of scope for this pass
+and are still outstanding.
+
+---
 
 ## Environment notes
 

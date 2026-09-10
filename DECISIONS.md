@@ -46,32 +46,50 @@ and the client has been told; silence is then a decision, not a delay.
 | Register | Confirmed | Assumed or in progress | Deferred to its sprint |
 | --- | --- | --- | --- |
 | Blueprint decisions (D) | D1, D2, D4, D6, **D7**, D10 · **D5 `REVISED`** | **D3, D8, D9 (with D9a–D9d)** assumed | — |
-| Plan confirmations (C) | **C4**, C6 (mechanism + dev store), C7, **C12**, **C13** | C2, C10, C11 assumed · **C6 live Administrator** pending, on the go-live checklist | C1, C3, C5, C8, C9 |
+| Plan confirmations (C) | **C4**, C6 (mechanism + dev store), C7, **C12**, **C13** | C2, C10, C11 assumed · **C6 live Administrator** pending, on the go-live checklist | C1, C3, C5, C8, C9 · **C14 `PENDING` — not deferred and not `ASSUMED`: needed before go-live, and it takes an explicit answer from Robert** · **C15** and **C16** raised 9 Sep 2026 |
 | Migration discovery (MD) | MD1–MD10 | — | — |
 | Open questions (Q) | — | Q3 (via C2) | Q1, Q2, Q4, Q5 map to the C items beside them |
 | Technical validations (V) | V1, V3, **V4**, V5, V8 resolved | — | V2, V6, V7, V9, V10, V11 — ours to close, not the client's |
 
 ### What still needs Robert
 
-**Two items:**
+**Corrected 10 Sep 2026.** This heading read *"Two items"* and counted only what
+gates go-live, which read as the whole client-facing list. It is not.
+**Section 3 is the authoritative list.** It carries ten `PENDING` plan
+confirmations — C1, C3, C5, C8, C9, C10, C11, and C14, C15, C16 added or
+promoted on 10 Sep 2026 — and every one of them needs an OSC position, whether
+or not it gates launch. The table below is the **go-live subset** of that list,
+not the list.
+
+**Gates go-live — three items:**
 
 | Ref | Question | Needed by |
 | --- | --- | --- |
 | **C6 (live)** | Who holds the first Administrator role on the production store? | Go-live |
-| **C14** | Does a Privilege Club voucher reduce the points earned on that order? Our call is yes — spend £550 of a £600 basket, earn 550 points — because the rule is "£1 spent = 1 point" and earning on voucher-paid value compounds loyalty value. Raised 2 Sep 2026 from a live dev-store order. | Before go-live; the code is being corrected to this now |
+| **C14** · `PENDING` | Does a Privilege Club voucher reduce the points earned on that order? Our call is yes — spend £550 of a £600 basket, earn 550 points — because the rule is "£1 spent = 1 point" and earning on voucher-paid value compounds loyalty value. Raised 2 Sep 2026 from a live dev-store order. | Before go-live, and **an explicit answer is required — this is `PENDING`, not `ASSUMED` and not confirmed.** The code is built to "yes" (corrected in `AdminApiOrderSource` on 3 Sep 2026), so the outstanding item is the answer rather than the build. A wrong earn base is invisible and compounds |
+| **C5** | The live store's currency and reporting timezone | Go-live, for reporting correctness. A fact about OSC's store rather than a decision |
+
+**Open with OSC, not gating go-live:** **C1** (the online redemption control —
+blocks the storefront half of Sprint 3), **C3** (full-price qualification),
+**C8** (PDF export approach), **C9** (adjustments and overrides at the till —
+ask alongside V16), **C10** and **C11** (assumed and built), **C15** (does a
+member get told when a refund reduces their balance?) and **C16** (individual
+voucher objects on A6 and UI C2 against D1). Each is in section 3 with its
+recommendation.
 
 **C4 is answered.** Confirmed 31 Aug 2026: lapsed members *do* receive the
 birthday voucher, on date of birth alone. It is off this list and out of
-Sprint 2's way. The item that remains is a name, not a decision — the C6
-**mechanism** is confirmed, and the named live-store Administrator is carried on
-the **go-live checklist** for OSC to confirm before launch.
+Sprint 2's way. The C6 **mechanism** is confirmed, and the named live-store
+Administrator is carried on the **go-live checklist** for OSC to confirm before
+launch — a name, not a decision.
 
-Nothing else is waiting on him. The **assumed** decisions — D3, D8 and D9, with
-C2, C10 and C11 alongside them — were built to their recommendation and the
-client was notified on 27 Aug 2026: they are open to an **objection**, and do not
-need an approval to proceed. Each entry states how far it is built and what a late
-change would cost. The **deferred** items belong to a sprint that has not
-started, and will be raised with the work that needs them rather than now.
+The **assumed** decisions — D3, D8 and D9, with C2, C10 and C11 alongside them —
+were built to their recommendation and the client was notified on 27 Aug 2026:
+they are open to an **objection**, and do not need an approval to proceed. Each
+entry states how far it is built and what a late change would cost. The
+**deferred** items belong to a sprint that has not started, and will be raised
+with the work that needs them rather than now — but they are *deferred*, not
+absent, and the previous wording of this section let them read as absent.
 
 **Sprint 1 is complete and nothing blocks Sprint 2.** D3 and D9 were the two
 that did; both are now assumed and built to their recommendation. C4, the last
@@ -441,7 +459,7 @@ one account per email at database level; `migration_records.decision` gains
 | C2 | May a refund clawback push a balance below zero? (Q3) | `ASSUMED` — built to the recommendation, see D9 | Sprint 2 |
 | C3 | Is a full-price-only rule wanted, and does it apply to earning, redemption or both? (Q1) | `PENDING` | Not built |
 | C4 | Do lapsed members receive the birthday reward? | `CONFIRMED` 2026-08-31 — **yes, on DOB alone** | — |
-| C5 | Live store currency and reporting timezone (Q4) | `PENDING` | Sprint 5 |
+| C5 | Live store currency and reporting timezone (Q4) | `PENDING` | Sprint 5 · **go-live, for reporting correctness** |
 | C6 | Who is the first Administrator? (Q5) | Mechanism `CONFIRMED` 2026-08-31 · dev store `CONFIRMED` · **live name `PENDING`, go-live checklist** | Go-live |
 | C7 | Do OSC tills operate while offline? | `CONFIRMED` | — |
 | C8 | PDF export fidelity vs. server dependency | `PENDING` | Sprint 5 |
@@ -450,6 +468,9 @@ one account per email at database level; `migration_records.decision` gains
 | C11 | Does the Privilege Club card carry its own number, or is it derived from the account? | `PENDING` (assumed) | Built to the recommendation |
 | C12 | Is automated work audited, and at what grain? | `CONFIRMED` 2026-08-31 — **yes, one entry per run / per order** | — |
 | C13 | What happens to a redemption quote nobody paid for? | `CONFIRMED` 2026-08-31 — **voided, entitlement withdrawn, no re-quote** | — |
+| **C14** | Does a Privilege Club voucher reduce the points earned on that order? | `PENDING` — **code built to "yes"**, raised 2 Sep 2026 from a live dev-store order. **Not `ASSUMED` and not confirmed: it needs Robert's explicit answer, and silence does not close it** | **Go-live** |
+| **C15** | Is a member told when a refund reduces their balance? | `PENDING` — raised 9 Sep 2026 by V20's sweep. Nothing is built either way | Sprint 4 (Klaviyo flows) |
+| **C16** | The agreed UI shows individual voucher objects with codes and expiry; D1 removed that object | `PENDING` — raised 9 Sep 2026 by the internal status review. **Needs Robert / OSC before A6 or UI C2 is designed** | A6, UI C2 |
 
 ### C1 — How a customer chooses an amount online · `PENDING`
 
@@ -694,6 +715,95 @@ stale-entitlement case the sweep exists for.
 
 ---
 
+### C14 — Does a voucher reduce the points earned on that order? · `PENDING` · **blocks go-live**
+
+Raised 2 Sep 2026 from a live dev-store order, and it is the part of D3 that is
+still genuinely open. A member pays £550 of a £600 basket because a £50
+Privilege Club voucher covered the rest: do they earn **550** points or 600?
+
+**Our call is 550**, and the code is built that way. The programme rule is
+"£1 spent = 1 point" and £550 is what the member spent; earning on voucher-paid
+value lets loyalty value earn further loyalty value, which compounds.
+
+**Status: `PENDING`. It is deliberately not `ASSUMED`, and it is not
+confirmed.** D3's assumed posture — built to the recommendation, client
+notified, silence is a decision — **does not extend to C14**. This one waits on
+an explicit answer from **Robert / OSC**, because the alternative reading
+over-earns on every discounted order and neither the register nor the code can
+settle a question about what OSC intends the programme to pay. The code being
+built one way is a fact about the build, not a decision the client has taken.
+
+*Built, not waiting.* The defect this was raised from was fixed in
+`AdminApiOrderSource` on 3 Sep 2026 — the line query now selects
+`discountAllocations` and `lines()` subtracts them, so the earn base is
+`gross − allocations` and, on a tax-inclusive order, `gross − allocations − tax`.
+Real order `#1002` was corrected by `loyalty:replay-orders` and reconciles.
+
+*Why it is a go-live gate even though it is built.* A wrong earn base is
+invisible to everyone — it does not error, it does not reconcile differently,
+and it compounds on every discounted order. The cost of confirming it now is one
+sentence from Robert; the cost of discovering it wrong later is a re-run of every
+order since launch.
+
+*Related:* D3 (the earn base), V12 (the tax-inclusive branch of the same
+calculation, still unproved).
+
+### C15 — Is a member told when a refund reduces their balance? · `PENDING` (new, raised 2026-09-09)
+
+Raised by the sweep behind V20. The proposal commits **five** member events and
+every one of them announces good news: enrolment, points becoming available, a
+voucher increment reached, points expiring soon, a birthday reward issued.
+**Nothing tells a member their balance went down** after a refund.
+
+*Why it is not simply an oversight to fix.* `voucher.increment_reached` asserts
+a **gain**. A downward crossing cannot reuse it without the name lying, so
+honouring the request literally needs a **sixth event name against a proposal
+that commits to five** (M11). That is a scope question, not an implementation
+detail, which is why it is recorded rather than taken.
+
+*Recommendation.* Genuinely OSC's call. Telling the member is more transparent;
+not telling them avoids drawing attention to a reduction they may not have
+noticed. **Get it answered before the Klaviyo flows are configured**, because
+the flow set is what makes the answer expensive to change.
+
+*State of the build.* Nothing is built either way. The downward case is
+deliberately silent and recorded as such.
+
+### C16 — Individual voucher objects on A6 and UI C2, against D1 · `PENDING` (new, raised 2026-09-09)
+
+Raised by the internal status review of 9 Sep 2026, and it is the most
+significant scope conflict currently open.
+
+*The disagreement.* The agreed UI structure
+(`docs/ui/OSC_Privilege_Club_UI_Structure_v1_1_FINAL.html`) shows **individual
+points vouchers as objects** — a code (`PC-5F2A-9911`), a value, an issue date,
+an **expiry date**, a status, and per-voucher **Cancel** / **Reissue** — on the
+admin **A6 Voucher management** screen *and* in the member's own account view
+(**UI C2**, "£10 Reward voucher · Use by 2 Jan 2027").
+
+**D1 (`CONFIRMED` 26 Aug 2026) removed that object.** The points-derived voucher
+balance has no expiry of its own and falls automatically as the underlying
+points expire; only the **birthday reward** is a real issued record with its own
+expiry. The code follows D1.
+
+*Which is right.* D1 is the confirmed decision and it is the better one — it
+removes a class of reconciliation problem and it is what makes the balance
+identical online and in store in real time. But **the client signed off a UI
+that shows something else**, and the two are not reconcilable as drawn.
+Whatever is built for A6 and UI C2 will look materially different from the
+layouts OSC reviewed.
+
+*What is needed, and from whom.* **Robert / OSC must confirm** that the live
+calculated balance replaces the individual voucher list on both surfaces, before
+either screen is designed. This has not yet been put to them. Our
+recommendation is to keep the derived balance and adjust both layouts to match
+it.
+
+*Do not treat this as resolved by D1 alone.* D1 settles what the system does; it
+does not settle what the client agreed to see. Only OSC can close the gap
+between the two. Related: V21 (the reward lifecycle behind A6) and the A5/A10
+wording noted against D1 and D2.
+
 ## 4. Migration discovery confirmations
 
 All confirmed by the client in `data-migration-client-feedback-06-08-2026`
@@ -831,10 +941,20 @@ none is silently assumed.
 | Q3 | May a refund clawback push a balance below zero when the points are already spent? | C2 |
 | Q4 | Which timezone and currency does a report speak, given a dollar development store and sterling rules? | C5, R3 |
 | Q5 | Who is the first Administrator, before any role exists? | C6 |
+| **Q6** | Does a member hear about a balance that went **down**? The proposal commits five events and all five announce good news. Raised 9 Sep 2026. | C15 |
+| **Q7** | Does the member see one live reward balance, or a list of individually coded vouchers as the agreed UI draws? Raised 9 Sep 2026. | C16, D1 |
 
 ---
 
 ## 6. Technical validations
+
+> **The standard this table is kept to, restated 10 Sep 2026.** A validation is
+> **`RESOLVED`** or **`ANSWERED`** only when the question was settled by
+> documentation, a spike, or real behaviour on a real shop or device. A defect
+> whose repair exists in the codebase is **`FIXED IN CODE`** — which is a
+> different claim: passing tests, fixtures, mocks, compiled-Wasm suites and code
+> review do **not** amount to verification against Shopify. Where a fix has real
+> device or shop evidence behind it, the row names that evidence explicitly.
 
 | Ref | Question | Status | Blocks |
 | --- | --- | --- | --- |
@@ -851,18 +971,21 @@ none is silently assumed.
 | V10 | Store-wide sales figure that reconciles with Shopify analytics | `OUTSTANDING` | Sprint 5 |
 | V11 | Customer account UI extension target and deployability under the legacy install flow | `OUTSTANDING` | Sprint 4 |
 | **V12** | **Earn base on a tax-INCLUSIVE shop: the order of the discount-allocation and tax subtractions** | `OUTSTANDING` — **BLOCKS GO-LIVE**; unprovable on the dev store, closed by live-store reconciliation | Before production |
-| **V13** | **Nothing checks that the shop currency and the rules currency agree** — a live defect, found 3 Sep 2026 | `OUTSTANDING` — fix before go-live; not a gate while both are GBP | Sprint 3 tail |
+| **V13** | **Nothing checks that the shop currency and the rules currency agree** — a live defect, found 3 Sep 2026 | **`FIXED IN CODE` 2026-09-03** — `AdminApiDiscountCodeWriter::create()` reads the shop currency through `ShopCurrency` and refuses to mint when it disagrees with `RuleSet::currency()`; `tests/Feature/CurrencyGuardTest.php` covers it. **This row read `OUTSTANDING` until 10 Sep 2026 and was stale.** Fixed in code is not proven on a shop: no mismatched mint has been attempted since. **Residual:** `pointsFor()` is still currency-blind | Sprint 3 tail |
 | **V14** | **A compensating `earn_reversal` carries no `qualifying_value_pence`, so reported spend overstates what the member actually spent** — found 3 Sep 2026 | `OUTSTANDING` — reporting only; points and segmentation are correct | Sprint 5 |
 | **V15** | **`@shopify/ui-extensions` installed at 2025.10.16 while the loyalty tile declares `api_version = "2026-07"`** - nothing pins the two together - found 3 Sep 2026 | `OUTSTANDING` - not blocking; resolve before trusting any conclusion drawn from those types | Sprint 3 tail |
 | **V16** | **Every till user needs a Privilege Club role and only the first staff member on a shop is bootstrapped** — an unassigned assistant gets `403 no_role_assigned` and the tile looks broken — found 3 Sep 2026 | `OUTSTANDING` — **BLOCKS GO-LIVE**; the implicit-viewer decision is parked next to C9 | Before production |
-| **V17** | **The tile discards the reason a request failed**, mapping every error but two to "That search could not be run." — raised 3 Sep 2026 | `OUTSTANDING` — small fix; third time in one day that a swallowed error cost time | Sprint 3 tail |
+| **V17** | **The tile discards the reason a request failed**, mapping every error but two to "That search could not be run." — raised 3 Sep 2026 | **`FIXED IN CODE` 2026-09-03** — `messageFor()` in `extensions/loyalty-tile/src/lib/reasons.js`, called from three sites in `Modal.jsx`: known codes get till wording ending in an instruction, unknown codes fall back to the server's own message rather than a generic string. **This row read `OUTSTANDING` until 10 Sep 2026 and was stale.** Device evidence covers the **offline** refusal only (9 Sep 2026) | Sprint 3 tail |
 | **V18** | **The TILL is a second denominator that V13 could not see** — a foreign till would discount $50 for GBP 50 of points and print "£50.00" — found 3 Sep 2026 | **GUARD `WITHDRAWN` 9 Sep 2026 — it was never a second guard.** `session.currency` reports the SHOP's currency, so the comparison duplicates V13. **The defect is UNCOVERED**, not handled. Replacement is V24 | Sprint 3 |
-| **V19** | **The tile listens for `onPress` and `onSubmit`, which POS components never emit** — nine buttons, the results list, the step controls and redeem are all inert — found 3 Sep 2026 | `OUTSTANDING` — **BLOCKS SPRINT 3**; steps 9-12 were never reachable | Sprint 3 |
+| **V19** | **The tile listens for `onPress` and `onSubmit`, which POS components never emit** — nine buttons, the results list, the step controls and redeem are all inert — found 3 Sep 2026 | **`FIXED IN CODE` 2026-09-03** — `Modal.jsx` now carries **10 `onClick` and 0 `onPress`**, plus a visible Search button, and `handlerContract.test.js` derives its allowlist from the installed platform types. **Corroborated on real hardware 9 Sep 2026**: two POS holds reached `hold()` from the device, one of them after the £5 steppers took £50 down to £25 — controls that were among the nine dead ones. **The row read `OUTSTANDING — BLOCKS SPRINT 3` until 10 Sep 2026; that was stale and it no longer blocks Sprint 3** | Sprint 3 |
 | **V20** | **`voucher.increment_reached` fired from one code path only** — a member pushed over a five-pound increment by a manual adjustment, or by points restored on a refund, was never told — found 9 Sep 2026 | **`RESOLVED` 9 Sep 2026** — every production path that can raise the available balance now announces. **A downward crossing still has no event and is raised separately** | Sprint 3 |
 | **V24** | **A foreign till can denominate a sterling voucher in its own currency and nothing catches it** — the uncovered half of V18, now that its guard is withdrawn. `applyCartDiscount` takes a bare amount with no currency parameter, so the till always denominates — raised 9 Sep 2026 | `OUTSTANDING` — **BLOCKS GO-LIVE only if OSC ever trades outside GBP**; the client has confirmed UK-only, so it is a correctness gap rather than a launch gate | Sprint 3 tail |
-| **V23** | **A POS hold that PASSES records nothing about what it compared** — `till_currency` is never persisted and only logged on refusal, so a hold that succeeded on a US-addressed location cannot be explained; V18 may be comparing the SHOP currency, in which case it duplicates V13 and protects against nothing — found 9 Sep 2026 | `OUTSTANDING` — instrumented 9 Sep 2026, so the next successful POS hold answers it | Sprint 3 |
+| **V23** | **A POS hold that PASSES records nothing about what it compared** — `till_currency` was never persisted and only logged on refusal, so a hold that succeeded on a US-addressed location could not be explained — found 9 Sep 2026 | **`ANSWERED` 2026-09-09** by the Canada hold `PC-46033088`: `till_currency` and `shop_currency` both `GBP` at a location whose market base is CAD, so **`session.currency` reports the SHOP's currency**. V18 therefore duplicated V13 and is `WITHDRAWN`; the original defect is **uncovered** and re-raised as **V24**. **Answered, not fixed** — the acceptance logging stays. The row read `OUTSTANDING` until 10 Sep 2026 | Sprint 3 |
 | **V22** | **The `no_role_assigned` refusal names no staff id**, so an Administrator cannot learn which id to assign and V16 was undiagnosable without a device-side read — found 9 Sep 2026 | **`RESOLVED` 9 Sep 2026** — the id is logged server-side on the refusal | Sprint 3 |
 | **V21** | **The reward lifecycle is a missing state machine** — `loyalty_rewards` models five states and only `issued` is reachable; no transition to `redeemed`, `expired`, `cancelled` or `superseded` exists anywhere — found 9 Sep 2026 | `PARKED` pending a briefing — **overlaps V14**; both turn on what a stored column is allowed to mean | Sprint 5 gate |
+| **V25** | **Refund and cancellation have never met a real Shopify event** — raised by the internal status review 9 Sep 2026, not previously tracked as a validation. `refunds/create` and `orders/cancelled` have never been delivered; the newest `webhook_events` row is `orders/paid`, 2 Sep 12:54:37. D9 and D9a–D9d are test-only | `OUTSTANDING` — nothing blocks it; **provable on the dev store today**. Mechanism, not fidelity | **Effectively go-live** |
+| **V26** | **No sweep has ever run on a real shop with real consequence** — raised by the internal status review 9 Sep 2026. No `schedule:run` cron exists on the dev machine, `loyalty_rewards` holds 0 rows, and a held quote was observed sitting unswept | `OUTSTANDING` — needs a cron entry. Maturity, expiry, expiry-warning, birthday and segmentation are all evidenced by the test suite alone | Yes, at the deployment level |
+| **V27** | **Shopify's admin displayed "This feature isn't currently available for your store"** on 9 Sep 2026, on a screen not yet identified | `OUTSTANDING` — unidentified. A message of that form is a limitation announcing itself | Unknown until identified |
 
 ### V1 — UI layer · `RESOLVED` 2026-08-26, **corrected 2026-08-27**
 
@@ -1184,7 +1307,7 @@ rule. Nothing here reopens the dev-store route.
 `PROGRESS.md` — not merely noted. Two sessions were spent trying to settle it on
 the development store; that route is closed and should not be reopened.
 
-### V13 — The shop currency and the rules currency are never compared · `OUTSTANDING`
+### V13 — The shop currency and the rules currency are never compared · `FIXED IN CODE` 2026-09-03
 
 **A live defect, not a validation question.** Found 3 Sep 2026 when the
 development store's base currency changed to EUR mid-session and the app carried
@@ -1213,6 +1336,24 @@ trusting every caller.
 this is not a go-live gate — but the failure mode is silent, which is exactly
 the kind this register exists to stop being rediscovered. **Mine to have missed
 when the writer was written on 2 Sep 2026.**
+
+*Fixed in code, 3 Sep 2026 — and this entry said `OUTSTANDING` until 10 Sep
+2026, which was stale.* `AdminApiDiscountCodeWriter::create()` now resolves the
+shop currency through `ShopCurrency` and **refuses to mint** when it disagrees
+with `RuleSet::currency()`, rather than producing a plausible-looking code in
+the wrong money. `tests/Feature/CurrencyGuardTest.php` covers the refusal.
+
+*What that claim does and does not cover.* It is code evidence. **No mismatched
+mint has been attempted against Shopify since the fix**, so the guard has not
+been seen refusing a real one — unlike the defect itself, which was observed
+live. Under the standard at the head of this section that makes it
+`FIXED IN CODE`, not `RESOLVED`.
+
+*The residual is still open.* `RedemptionService::pointsFor()` remains
+currency-blind: it divides pence by `voucherValuePence` with no notion of which
+currency those pence are. The writer now refuses the mint, so the exposure is
+narrowed, but the question of whether `pointsFor()` should assert a currency of
+its own is **not closed**.
 
 ### V14 — A compensating reversal carries no qualifying value · `OUTSTANDING`
 
@@ -1483,7 +1624,7 @@ on 3 Sep 2026 to unblock the POS run — not through
 `PUT /api/admin/staff/{staffId}`, so there is no audit row for it. See V17 for
 the separate matter of the tile hiding the reason.
 
-### V17 — The tile discards the reason a request failed · `OUTSTANDING`
+### V17 — The tile discards the reason a request failed · `FIXED IN CODE` 2026-09-03
 
 Raised 3 Sep 2026. Small fix, and the third time in one day that swallowing a
 specific error cost real time.
@@ -1534,7 +1675,20 @@ evidence that was already in hand. Related: the testing rule recorded at
 `RULE 2026-09-03`, which is the same failure in a different medium — evidence
 discarded rather than never gathered.
 
-### V19 — The tile listens for events the POS components never emit · `OUTSTANDING` · **blocks Sprint 3**
+*Fixed in code, 3 Sep 2026 — and this entry said `OUTSTANDING` until 10 Sep
+2026, which was stale.* `messageFor()` in
+`extensions/loyalty-tile/src/lib/reasons.js` is the fix, called from three sites
+in `Modal.jsx`. Codes the backend actually returns get till wording that ends in
+an instruction — almost always *continue the sale*, per C7 — and anything
+unrecognised falls back to the server's own `payload.error.message` rather than
+to a generic string.
+
+*How far that is evidenced.* The **offline** refusal was read on a real device
+on 9 Sep 2026, so one path through this wording is real. Every other refusal
+string — the 403, the basket, cap and eligibility refusals — has been seen only
+in the suite. `FIXED IN CODE`, with one path corroborated on hardware.
+
+### V19 — The tile listens for events the POS components never emit · `FIXED IN CODE` 2026-09-03 · **no longer blocks Sprint 3**
 
 Found 3 Sep 2026, diagnosing why member search does nothing on Android POS. The
 search box was the first symptom, not the defect.
@@ -1600,7 +1754,27 @@ support, rather than testing `lib/` alone.
 given. This is the tile never asking. Both were invisible for the same underlying
 reason: a failure with no wording looks exactly like a feature that does nothing.
 
-### V18 — The till is a second denominator, and V13's guard could not see it · `GUARD RESOLVED, SUCCESS PATH UNVERIFIED` 2026-09-03
+*Fixed 3 Sep 2026, and this entry read `OUTSTANDING — blocks Sprint 3` until
+10 Sep 2026, which was stale in the direction that matters least and mattered
+anyway: it kept a resolved blocker on the board.* The nine `onPress` handlers
+are now `onClick` — `Modal.jsx` carries **10 `onClick` and 0 `onPress`** — and
+the search field's `onSubmit` was replaced with a **visible Search button**.
+`handlerContract.test.js` derives its allowlist from the installed
+`@shopify/ui-extensions` type declarations and was verified by reintroducing the
+defect.
+
+*And this one has real device evidence — stated to exactly what was recorded.*
+The two POS holds of 9 Sep 2026 (`PC-23502758`, `PC-46033088`) both reached
+`hold()` from a real device, which takes **Apply**; and `PC-23502758` was
+£25 **stepped down from £50**, which takes the **£5 steppers**. Apply and the
+steppers were among the nine dead controls, so **that is a real-device
+corroboration of the fix**, not merely a green suite. **What is inference and
+not observation:** that a search result was tapped. A hold implies the member
+screen and tapping a result is the only route to it, but no record says a result
+was tapped after the fix — and V15's version skew still means the *types* half
+of the evidence is not settled on its own.
+
+### V18 — The till is a second denominator, and V13's guard could not see it · `GUARD RESOLVED, SUCCESS PATH UNVERIFIED` 2026-09-03 · **SUPERSEDED — `WITHDRAWN` 9 Sep 2026, see the withdrawal entry below**
 
 Found and fixed 3 Sep 2026, from `cur=USD` on a live Android device.
 
@@ -1996,7 +2170,7 @@ a side benefit of this.
 
 ---
 
-### V23 — a POS hold that passes records nothing about what it compared · `OUTSTANDING`, instrumented 2026-09-09
+### V23 — a POS hold that passes records nothing about what it compared · `ANSWERED` 2026-09-09, instrumented 2026-09-09
 
 **What was asserted, by both of us, and was wrong.** That the till is denominated
 by the market matching its **location's** country, so a GBP till requires a
@@ -2048,6 +2222,20 @@ than passing quietly.
 `till_currency` and `shop_currency` are both GBP the question stays open on that
 evidence alone; the discriminating observation is a hold from a till whose
 location market differs from the shop currency.
+
+**Answered the same day, and this entry said `OUTSTANDING` until 10 Sep 2026.**
+The discriminating observation arrived: `PC-46033088`, held at location
+`95318049008` whose market base currency is **CAD**, logged
+`till_currency: GBP` identical to `shop_currency: GBP`. Two location markets,
+one reported currency, both accepted. **`session.currency` reports the SHOP's
+currency**, which is the second of the two answers above — so V18 compared shop
+against rules, exactly what V13 already does, and is `WITHDRAWN`.
+
+**Answered, not fixed, and the distinction is the whole point.** V23 asked what
+the guard was comparing. It was comparing the wrong thing. The defect V18 was
+built for is therefore **uncovered**, and is carried as **V24** — it must not be
+read as handled. The acceptance logging stays in place: it is what made the
+answer readable, and it is what will make the next surprise readable.
 
 ---
 
@@ -2268,10 +2456,42 @@ pattern and the only one that invents a failure rather than hiding one.
 
 ---
 
+### V25, V26, V27 — raised by the internal status review · `OUTSTANDING` 2026-09-09
+
+Three gaps the review found that were **real and untracked**: none had a
+validation number, and two of them are the reason several modules cannot be
+called verified.
+
+**V25 — no real refund or cancellation has ever been processed.** `refunds/create`
+and `orders/cancelled` have never been delivered to this app; the newest
+`webhook_events` row is an `orders/paid` from 2 Sep 12:54:37. D9's proportional
+restore, D9a's negative release allocations, D9b's maturity netting, D9c's
+cumulative floor and D9d's partial-refund state handling are the most carefully
+reasoned code in the project and every one of them is evidenced **by the test
+suite alone**. This is mechanism rather than fidelity, so it belongs on the
+development store and is **cheap** — one real refund, one real partial refund and
+one real cancellation.
+
+**V26 — no sweep has ever run on a real shop with real consequence.** There is no
+`schedule:run` cron on the dev machine, so maturity, expiry, the expiry warning,
+birthday issuance and segmentation have never executed anywhere but in the
+suite. `loyalty_rewards` holds **0 rows**, and a held quote was observed sitting
+unswept for exactly this reason. Closing it needs a cron entry and a date of
+birth on a test account, not code.
+
+**V27 — an unidentified admin limitation message.** Shopify's admin displayed
+*"This feature isn't currently available for your store"* on 9 Sep 2026, on a
+screen nobody recorded. A message of that form is a limitation announcing
+itself, and the cost of identifying it now is minutes against the cost of
+meeting it in the middle of a build that depends on it.
+
+---
+
 ## 7. Change log
 
 | Date | Change |
 | --- | --- |
+| 2026-09-10 | **Documentation sync against the internal status review of 9 Sep 2026. No application code was changed.** Four stale register rows corrected: **V13**, **V17** and **V19** were all `OUTSTANDING` — V19 as *BLOCKS SPRINT 3* — while all three have been fixed in the codebase since **3 Sep 2026**, verified by reading the code (`AdminApiDiscountCodeWriter` refuses a currency mismatch; `messageFor()` exists and is called; `Modal.jsx` carries 10 `onClick` and 0 `onPress`); and **V23** was answered on 9 Sep by the Canada hold and still read `OUTSTANDING`. A **`FIXED IN CODE` vs `RESOLVED`** distinction is now stated at the head of section 6, so a repair that exists in the codebase can no longer be recorded as proven against Shopify. **C14 promoted to a full entry and added to section 3** — it had existed only in the section 1 summary. **C5 marked as a go-live item** for reporting correctness. Section 1's *"Two items"* framing corrected: it counted only the go-live subset and read as the whole client-facing list, which section 3 contradicts. **Three new client questions recorded** — **C15** (is a member told when a refund reduces their balance? a sixth event against a proposal committing to five) and **C16** (the agreed UI's individual voucher objects against D1, **which needs Robert / OSC before A6 or UI C2 is designed**), with **Q6** and **Q7** mapped to them. **Three new validations recorded** — **V25** (no real refund or cancellation has ever been delivered), **V26** (no sweep has ever run on a real shop) and **V27** (the unidentified admin limitation message). Nothing unresolved was closed: V12, V14, V16, V21, V24, C1, C3, C8, C9, C10 and C11 all stand exactly as they were. |
 | 2026-08-25 | D5 and D6 closed by spike. Blueprint revised to Rev 2. |
 | 2026-08-26 | Implementation Plan published. C1–C8, Q1–Q5, V1–V11 registers created. |
 | 2026-08-26 | D1, D2, D10 approved as recommended by client. Sprint 1 authorised. |
