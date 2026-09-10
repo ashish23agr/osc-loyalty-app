@@ -55,10 +55,10 @@ and the client has been told; silence is then a decision, not a delay.
 
 **Corrected 10 Sep 2026.** This heading read *"Two items"* and counted only what
 gates go-live, which read as the whole client-facing list. It is not.
-**Section 3 is the authoritative list.** It carries ten `PENDING` plan
+**Section 3 is the authoritative list.** It carries eleven `PENDING` plan
 confirmations — C1, C3, C5, C8, C9, C10, C11, and C14, C15, C16 added or
-promoted on 10 Sep 2026 — and every one of them needs an OSC position, whether
-or not it gates launch. The table below is the **go-live subset** of that list,
+promoted on 10 Sep 2026, plus **C17** raised the same day — and every one of
+them needs an OSC position, whether or not it gates launch. The table below is the **go-live subset** of that list,
 not the list.
 
 **Gates go-live — three items:**
@@ -375,6 +375,15 @@ receives a maturity entry.
 
 ### D9c — Rounding is a cumulative floor · `ASSUMED` 2026-08-31
 
+> **The demonstration figures are worked out and recorded — do not re-derive
+> them.** `docs/DEV_STORE_TEST_SCRIPT.md` section E: **3 × £69.99**, eligible
+> 20997p, 209 points earned. Two single-unit refunds reverse **69 then 70** under
+> the cumulative rule against **69 then 69** under a naive per-refund floor — one
+> point, in the member's favour. **The restore half divides evenly (333 then 333
+> under both rules), so D9c is demonstrated by the reversal half only** and the
+> restore half is ordinary D9 coverage. Round figures cannot show it: £70 × 3
+> makes both rules agree.
+
 **ASSUMED — implemented to the industry-standard default, client notified 27 Aug 2026, pending client objection (not approval).** Mechanics within D9.
 
 **Per-refund fractions are never rounded.** Every reversal is computed from the
@@ -453,6 +462,19 @@ one account per email at database level; `migration_records.decision` gains
 
 ## 3. Plan confirmations
 
+**This section is the authoritative register of open client decisions.** Stated
+here as well as in section 1, because section 1 is a summary and a reader who
+arrives at this table directly would otherwise not know it carries the authority.
+Section 5 holds the open questions (Q1-Q8) that map onto these items.
+
+Everything client-facing **cites** this table rather than restating it -
+including `docs/STATUS_FOR_CLIENT.md`, which renders it for OSC with a `Ref`
+column back to these refs, and `docs/STATUS_INTERNAL.md`. **Where any of them
+disagrees with this table, this table wins.** A new client decision is added
+here first and cited elsewhere second: two copies of a fact where one is
+authoritative and nothing enforces which is how a register stops being a
+register.
+
 | Ref | Question | Status | Blocks |
 | --- | --- | --- | --- |
 | C1 | Online: does the voucher apply automatically, or does the customer choose an amount? (Q2) | `PENDING` — **mechanism built and swappable**, see below | Sprint 3 |
@@ -471,6 +493,7 @@ one account per email at database level; `migration_records.decision` gains
 | **C14** | Does a Privilege Club voucher reduce the points earned on that order? | `PENDING` — **code built to "yes"**, raised 2 Sep 2026 from a live dev-store order. **Not `ASSUMED` and not confirmed: it needs Robert's explicit answer, and silence does not close it** | **Go-live** |
 | **C15** | Is a member told when a refund reduces their balance? | `PENDING` — raised 9 Sep 2026 by V20's sweep. Nothing is built either way | Sprint 4 (Klaviyo flows) |
 | **C16** | The agreed UI shows individual voucher objects with codes and expiry; D1 removed that object | `PENDING` — raised 9 Sep 2026 by the internal status review. **Needs Robert / OSC before A6 or UI C2 is designed** | A6, UI C2 |
+| **C17** | Where the member's Privilege Club section lives: reached from the account area and opening as a themed page, rather than rendering inside the account page itself | `PENDING` — raised 10 Sep 2026. **Ask alongside C16: both change the same agreed UI.** Nothing to be built either way until answered | UI C1, UI C2, the member-facing build |
 
 ### C1 — How a customer chooses an amount online · `PENDING`
 
@@ -804,6 +827,102 @@ does not settle what the client agreed to see. Only OSC can close the gap
 between the two. Related: V21 (the reward lifecycle behind A6) and the A5/A10
 wording noted against D1 and D2.
 
+### C17 — Where the member's Privilege Club section lives · `PENDING` (new, raised 2026-09-10)
+
+**Ask this alongside C16.** Both are changes to the same agreed UI, and putting
+them separately invites two rounds of the same conversation.
+
+#### What Robert will actually see
+
+A member signs into their Shopify account and finds their **Privilege Club**
+section there, as agreed. **What we propose is that it opens as a page in OSC's
+own theme** — carrying their reward balance, their vouchers, their reward history
+and any expiry warning — **rather than a panel that renders inside the Shopify
+account page itself.**
+
+**The Privilege Club stays in his account area.** A small block sits inside the
+Shopify account page, where the member expects to find it, and opens the section
+from there. **Placement is native; the content is ours.** This is **not** a
+proposal to move the Privilege Club out of the customer's account — only to
+render its contents on a page we control rather than inside Shopify's.
+
+**Nothing is built either way, so neither answer costs OSC any rework.** The
+member-facing surface is at zero today: no account section, no page, no panel.
+The agreed layout has not been implemented and then changed — it has not been
+implemented at all. Whichever way this is answered, it is answered before
+anything exists to unpick.
+
+To the member the difference is one step and a change of styling: the section is
+still reached from their account, and it looks like the rest of the OSC site
+rather than like Shopify's account furniture. Everything the agreed screen
+promises is on it.
+
+#### We recommend it, and these are the reasons
+
+- **Live data from our own ledger.** The page reads the member's balance,
+  vouchers and history directly from the Privilege Club database at the moment
+  they open it. There is no copy of the balance to go stale, and the figure is
+  identical to what OSC staff see in the console and at the till, in real time.
+- **OSC's own branding.** The page renders inside the live theme, so it inherits
+  OSC's fonts, colours and header rather than Shopify's account styling.
+- **It removes a dependency on Shopify's approval timeline.** The alternative
+  needs a data-access grant that only Shopify can give, on Shopify's schedule.
+  We already have one such request outstanding with them since 27 August (D7,
+  `read_all_orders`). We would rather not put a launch-critical member-facing
+  screen behind a second one.
+
+#### What we are NOT doing, and why — this is a capability judgement, not cost
+
+**We are not building the member's balance to render natively inside the Shopify
+account page.** The reasons are what that would buy and what it would cost in
+capability, **not** development time or budget:
+
+1. **It needs a Shopify grant on Shopify's timeline.** Rendering our data inside
+   the account page requires either access to protected customer data — a
+   Partner Dashboard grant Shopify approves at its own pace — or reading a copy
+   of the balance published onto the customer record, which needs a further
+   access scope and a schema declaration.
+2. **It still could not carry the reward history.** The published-copy route can
+   only hold a snapshot of a few values. **A transaction history is a list**, and
+   a list cannot sensibly live in that copy — so even after paying for the grant,
+   the history would have to be fetched from us anyway. **The expensive route
+   does not deliver the thing the agreed screen shows.**
+
+So this is not a compromise we fell into. The route we recommend delivers *more*
+of the agreed screen, not less, and the one it declines would still be
+incomplete after clearing an external dependency we do not control.
+
+**What we keep from the native route** is stated above rather than here: the
+block inside the account area needs no grant and no scope, so the placement the
+agreed UI promises is kept in full. Only the rendering of the contents moves.
+
+#### Two changes to one agreed UI — stop before building if either is refused
+
+C16 and C17 both alter the layouts OSC reviewed and signed off: **C16** replaces
+the individual voucher list with the live calculated balance, and **C17** moves
+where the member's section renders. They should be put to Robert **together and
+once**.
+
+**If Robert pushes back on either one, nothing gets built until it is re-planned.**
+Delivering a screen he did not sign off — twice over, on the same UI — is worse
+than the delay. Raise the answer before any member-facing work starts, not
+after.
+
+#### State of the build — internal detail
+
+Stated for OSC at the top; recorded here for us. What exists as of 10 Sep 2026
+is a deployability spike for the native block (**V11**, `IN PROGRESS`: the
+precondition is met and the extension bundles clean) and
+`PublishBalanceMetafieldJob`, a balance publisher with **no consumer**.
+
+Neither commits us to an answer, and that is deliberate. The spike tests only
+whether the block renders — it reads nothing — so it is equally useful under
+either answer. The publisher would be **stranded** by the recommended route,
+since the page reads the ledger directly; it retains option value only for the
+checkout reward panel and for a theme-rendered balance. That is a cost of about
+a day's fraction and it is recorded rather than hidden, because it should not
+influence the decision either way.
+
 ## 4. Migration discovery confirmations
 
 All confirmed by the client in `data-migration-client-feedback-06-08-2026`
@@ -943,6 +1062,7 @@ none is silently assumed.
 | Q5 | Who is the first Administrator, before any role exists? | C6 |
 | **Q6** | Does a member hear about a balance that went **down**? The proposal commits five events and all five announce good news. Raised 9 Sep 2026. | C15 |
 | **Q7** | Does the member see one live reward balance, or a list of individually coded vouchers as the agreed UI draws? Raised 9 Sep 2026. | C16, D1 |
+| **Q8** | Does the member's Privilege Club section open as a page in OSC's own theme, reached from the account area, or must it render inside the Shopify account page itself? Raised 10 Sep 2026. | C17 |
 
 ---
 
@@ -969,7 +1089,7 @@ none is silently assumed.
 | V8 | Extension API version alignment; remove unused function target | `RESOLVED` 2026-08-26 | Sprint 1 |
 | V9 | Klaviyo API revision and rate limits | `OUTSTANDING` | Sprint 4 |
 | V10 | Store-wide sales figure that reconciles with Shopify analytics | `OUTSTANDING` | Sprint 5 |
-| V11 | Customer account UI extension target and deployability under the legacy install flow | `OUTSTANDING` | Sprint 4 |
+| **V11** | Customer account UI extension target and deployability under the legacy install flow | `IN PROGRESS` 2026-09-10 — precondition met (`NEW_CUSTOMER_ACCOUNTS`), extension **bundles clean**; server-side acceptance and rendering are **separately gated**, see the entry | Sprint 4 |
 | **V12** | **Earn base on a tax-INCLUSIVE shop: the order of the discount-allocation and tax subtractions** | `OUTSTANDING` — **BLOCKS GO-LIVE**; unprovable on the dev store, closed by live-store reconciliation | Before production |
 | **V13** | **Nothing checks that the shop currency and the rules currency agree** — a live defect, found 3 Sep 2026 | **`FIXED IN CODE` 2026-09-03** — `AdminApiDiscountCodeWriter::create()` reads the shop currency through `ShopCurrency` and refuses to mint when it disagrees with `RuleSet::currency()`; `tests/Feature/CurrencyGuardTest.php` covers it. **This row read `OUTSTANDING` until 10 Sep 2026 and was stale.** Fixed in code is not proven on a shop: no mismatched mint has been attempted since. **Residual:** `pointsFor()` is still currency-blind | Sprint 3 tail |
 | **V14** | **A compensating `earn_reversal` carries no `qualifying_value_pence`, so reported spend overstates what the member actually spent** — found 3 Sep 2026 | `OUTSTANDING` — reporting only; points and segmentation are correct | Sprint 5 |
@@ -2484,6 +2604,115 @@ birth on a test account, not code.
 screen nobody recorded. A message of that form is a limitation announcing
 itself, and the cost of identifying it now is minutes against the cost of
 meeting it in the middle of a build that depends on it.
+
+---
+
+### V11 — Customer account UI extension deployability · `IN PROGRESS` 2026-09-10
+
+**The question.** Does a customer account UI extension deploy and render under
+`use_legacy_install_flow = true`? It matters more than a normal spike, because
+the answer decides how **half the programme's value** — a member seeing their own
+balance — gets delivered. The fallback ladder is in `PROGRESS.md`.
+
+#### What is established
+
+**The hard precondition is met, and it was checked first because it could have
+made the spike moot.** Customer account UI extensions require new customer
+accounts; a `CLASSIC` store cannot render them at all, for reasons unrelated to
+the install flow.
+
+```
+customerAccountsVersion                  = NEW_CUSTOMER_ACCOUNTS
+loginLinksVisibleOnStorefrontAndCheckout = true
+```
+
+**The extension bundles clean under our exact configuration**, target
+`customer-account.profile.block.render`, `api_version = "2026-07"`, against the
+`customer-account` surface present in the installed `@shopify/ui-extensions`
+`2025.10.16`:
+
+```
+loyalty-account  │ successfully built in 87ms (20.8 KB original, ~8.1 KB compressed)
+OSC Loyalty Solution built!          (exit 0)
+```
+
+Two things had to be fixed to get there, both of which would otherwise have
+failed a deploy for reasons unrelated to V11:
+
+- **A hand-scaffolded extension has no `tsconfig.json`.** Without
+  `"jsxImportSource": "preact"` esbuild resolves JSX to `react/jsx-runtime` and
+  the bundle fails outright. The POS tile carries the same file; `shopify app
+  generate extension` would have created it.
+- **`shopify app build` fails on the frontend in a plain shell** — *"The frontend
+  build needs an API key"* — and **that failure blocks `deploy`**, since deploy
+  builds first. Proved to pass by supplying `SHOPIFY_API_KEY` from the DevTunnel
+  handshake. In a TTY the CLI injects it.
+
+#### `--no-release` proves ACCEPTANCE, not RENDERING — and the difference matters
+
+Recorded because reading a clean `--no-release` as "it works" is the exact
+substitution that has cost four attempts in two days.
+
+`shopify app deploy --no-release` builds the app, uploads the bundle, and has
+**Shopify create and validate an app version server-side** without releasing it
+to the store. So it **does** answer the harder half of V11: the
+`use_legacy_install_flow` rejection is a *server-side version-creation* refusal —
+that is exactly how the webhook-subscription incompatibility presented, rejecting
+the entire app version with *"App-specific webhook subscriptions are not
+supported when use_legacy_install_flow is enabled"* — so if the flag refuses a
+customer account extension, `--no-release` surfaces it.
+
+**What it does not prove is that anything renders.** The version is not released,
+so the store is not running it. **A clean `--no-release` therefore closes
+"Shopify accepts this extension in an app version" and leaves "a member can see
+it" completely open.**
+
+Rendering needs one of two further steps, and neither is free:
+
+| Route to a render | Cost |
+| --- | --- |
+| Preview through a running `shopify app dev` session | A **new** extension is not registered in an already-running dev session, so dev must be restarted — which allocates a new tunnel and costs the full drill: toml, the tile's `APP_URL`, `deploy`, re-grant, and webhook re-registration |
+| Release the version | Touches what the store actually runs, and republishes the redirect URLs against whatever tunnel is current |
+
+**So a clean result today unblocks planning, not delivery**, and the entry says
+so rather than letting a green output stand in for a rendered page.
+
+#### The spike is deliberately static, and that is the point
+
+It renders one `s-section` of fixed text. No API call, no fetch, no import of
+ours. **A spike that also read the member's balance could fail three ways — a
+missing `customer_read_customers` scope, an undeclared customer metafield, or a
+dead app URL — and distinguish none of them.**
+
+This is the `appUrl` lesson applied **forward rather than backward**: that defect
+cost a day because a silent failure had several possible causes and the tile
+reported none of them. Designing the spike so that exactly one thing can be wrong
+is the same principle used before the fact instead of after it. **A spike that
+can fail three ways and tell you nothing about which is not a spike.**
+
+#### Route A is TWO gates, not one — a planning finding in its own right
+
+**"Can it render" and "can it read our data" are separately gated, and only the
+first is in play today.** The planning must not read as though a clean deploy
+opens the whole route.
+
+| Gate | Status | What it needs |
+| --- | --- | --- |
+| **A1 — can it render** | In progress, precondition met, bundles clean | Server-side acceptance (`--no-release`), then a render step |
+| **A2 — can it read our balance** | **Not started, and not a given** | **`customer_read_customers`** access scope, which this app does not hold; **and** a `[customer.metafields.app.*]` declaration carrying `access.customer_account`, which does not exist |
+
+`PublishBalanceMetafieldJob` (built 9 Sep 2026) writes a JSON `member` key in the
+app-reserved namespace with **no metafield definition**, so an extension has
+nothing declared to read. Closing A2 means a scope change, which means the full
+drill — restart dev, toml, `deploy`, re-grant — plus deciding whether to keep one
+JSON key or move to the typed definitions of plan section 6.3, which was recorded
+as a deliberate deviation on 9 Sep precisely because no consumer existed yet.
+**A2 is the moment that decision comes due.**
+
+Note that route **B** (an app proxy page carrying `logged_in_customer_id`) has
+neither gate: it reads the balance server-side from our own database and needs no
+customer scope and no metafield at all. If A2 proves expensive, B is cheaper than
+it first appeared.
 
 ---
 

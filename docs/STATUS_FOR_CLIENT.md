@@ -7,6 +7,13 @@ This is an honest current-state summary of the Privilege Club build: what is
 finished, what is genuinely working, what is not yet built, what we still need
 from OSC, and what can only be proven on your own store before launch.
 
+> **Internal note, not for the client.** The authoritative register of open
+> client decisions is **`DECISIONS.md` section 3, "Plan confirmations"**. This
+> document is a client-facing *rendering* of that register and must not become a
+> second copy of it: every decision in section 3 below carries its **Ref** back
+> to section 3, and where the two disagree, section 3 wins. If a decision is
+> raised with OSC, it is added to section 3 first and cited here second.
+
 ---
 
 ## 1. Currently outstanding
@@ -195,20 +202,37 @@ rather than counting it as finished.
 
 ### Business decisions we need answered
 
-| # | Decision | Why we need it | Our recommendation |
-| --- | --- | --- | --- |
-| 1 | **Does a Privilege Club reward reduce the points earned on that same order?** | A member who pays £550 of a £600 basket because a £50 reward covered the rest: do they earn 550 points or 600? | **550.** The programme rule is "£1 spent = 1 point", and £550 is what they spent. Earning on reward-funded value lets loyalty value earn further loyalty value, which compounds. **We have already built it this way** and need your confirmation before launch |
-| 2 | **How does a customer choose to redeem online?** | Does the reward apply automatically at checkout, or does the customer choose an amount? And where does that control appear? | The engine already supports both answers without any change. Our proposed default is a **"Shop with my £15" link from the account page that applies the reward automatically**, matching the button on your agreed account screen. We have not treated that as confirmed |
-| 3 | **How long is a reward code valid for, and what happens to an unused one?** | Currently an offer stands for twenty minutes and is then withdrawn at no cost to the member, and a reward code carries the same expiry so Shopify and our system cannot disagree | Confirm twenty minutes is acceptable for online checkout, or tell us the window you want |
-| 4 | **Should a member be told when a refund reduces their reward balance?** | The agreed scope commits to five member messages, and all five announce good news. Nothing currently tells a member their balance has gone **down** | This is genuinely your call. Telling them is more transparent; not telling them avoids drawing attention to a reduction they may not have noticed. If you want it, it is a sixth message against an agreed set of five |
-| 5 | **Can a till assistant adjust points, or only redeem?** | The data-migration discussion implied point adjustments at the till with "all roles OK", which does not match the four-role model in the specification, where a Viewer changes nothing | We have built **no** till adjustment capability until you confirm. Three questions: may a till assistant adjust points at all; does the console role model apply at the till; and should a manual override be capped and require a reason? |
-| 6 | **Is every till user going to be given a Privilege Club role?** | Only the first staff member to open the app is set up automatically. Every other till user currently gets a refusal, and the tile reads as broken | Either OSC assigns a role to each till user as a documented setup step, or we allow any verified till user read-only access automatically. **This must be settled before launch** — it would otherwise affect every till but one on day one |
-| 7 | **Do manually adjusted points expire like earned points?** | The specification covers expiry for earned and migrated points but not for points a member of staff adds by hand | **Yes, they expire like earned points.** Points that never expire are a liability that only grows, and a member comparing two credits would see one lapse and the other not. Built this way; cheap to change before launch |
-| 8 | **Do new physical cards carry their own numbers?** | Your agreed screens show two card numbers per member: the legacy Dynamics one and a new Privilege Club number | We currently generate the Privilege Club number from the member's record, so it is unique and stable and can be typed into the search box. Two questions: are new physical cards being issued, and if so who allocates the numbers? And should that number match anything in the legacy export? |
-| 9 | **Is a "full price only" earning rule wanted at all?** | Version 1.1 of the agreed scope removed full-price-only qualification throughout, and points now earn on all qualifying items including sale and promotional lines | We believe it is dropped and have built nothing for it. **Please confirm in writing** so we can close it |
-| 10 | **PDF export approach** | Report exports need to render as PDF | We recommend a pure-PHP approach rather than one that requires a browser engine on the server, which would add a significant dependency to your production environment |
-| 11 | **International and non-GBP customers** | The scope does not say what happens if a customer buys online in a currency other than sterling — whether they earn, at what rate, and what a reward is worth to them | **We are not inventing a rule here.** You have confirmed OSC trades UK-only, which means this does not arise in practice today. If that is permanent we will note it and move on. If OSC may ever sell in another currency, we need a rule for earning and redemption and would build a safeguard before launch |
-| 12 | **Individual voucher records vs one live reward balance** | See the scope point at the end of section 1 | We recommend keeping the live calculated balance, and adjusting the voucher management screen and the member account view to match it |
+| # | Ref | Decision | Why we need it | Our recommendation |
+| --- | --- | --- | --- | --- |
+| 1 | C14 | **Does a Privilege Club reward reduce the points earned on that same order?** | A member who pays £550 of a £600 basket because a £50 reward covered the rest: do they earn 550 points or 600? | **550.** The programme rule is "£1 spent = 1 point", and £550 is what they spent. Earning on reward-funded value lets loyalty value earn further loyalty value, which compounds. **We have already built it this way** and need your confirmation before launch |
+| 2 | C1 / Q2 | **How does a customer choose to redeem online?** | Does the reward apply automatically at checkout, or does the customer choose an amount? And where does that control appear? | The engine already supports both answers without any change. Our proposed default is a **"Shop with my £15" link from the account page that applies the reward automatically**, matching the button on your agreed account screen. We have not treated that as confirmed |
+| 3 | **see note** | **How long is a reward code valid for, and what happens to an unused one?** | Currently an offer stands for twenty minutes and is then withdrawn at no cost to the member, and a reward code carries the same expiry so Shopify and our system cannot disagree | Confirm twenty minutes is acceptable for online checkout, or tell us the window you want |
+| 4 | C15 / Q6 | **Should a member be told when a refund reduces their reward balance?** | The agreed scope commits to five member messages, and all five announce good news. Nothing currently tells a member their balance has gone **down** | This is genuinely your call. Telling them is more transparent; not telling them avoids drawing attention to a reduction they may not have noticed. If you want it, it is a sixth message against an agreed set of five |
+| 5 | C9 | **Can a till assistant adjust points, or only redeem?** | The data-migration discussion implied point adjustments at the till with "all roles OK", which does not match the four-role model in the specification, where a Viewer changes nothing | We have built **no** till adjustment capability until you confirm. Three questions: may a till assistant adjust points at all; does the console role model apply at the till; and should a manual override be capped and require a reason? |
+| 6 | V16 + C9 | **Is every till user going to be given a Privilege Club role?** | Only the first staff member to open the app is set up automatically. Every other till user currently gets a refusal, and the tile reads as broken | Either OSC assigns a role to each till user as a documented setup step, or we allow any verified till user read-only access automatically. **This must be settled before launch** — it would otherwise affect every till but one on day one |
+| 7 | C10 | **Do manually adjusted points expire like earned points?** | The specification covers expiry for earned and migrated points but not for points a member of staff adds by hand | **Yes, they expire like earned points.** Points that never expire are a liability that only grows, and a member comparing two credits would see one lapse and the other not. Built this way; cheap to change before launch |
+| 8 | C11 | **Do new physical cards carry their own numbers?** | Your agreed screens show two card numbers per member: the legacy Dynamics one and a new Privilege Club number | We currently generate the Privilege Club number from the member's record, so it is unique and stable and can be typed into the search box. Two questions: are new physical cards being issued, and if so who allocates the numbers? And should that number match anything in the legacy export? |
+| 9 | C3 / Q1 | **Is a "full price only" earning rule wanted at all?** | Version 1.1 of the agreed scope removed full-price-only qualification throughout, and points now earn on all qualifying items including sale and promotional lines | We believe it is dropped and have built nothing for it. **Please confirm in writing** so we can close it |
+| 10 | C8 | **PDF export approach** | Report exports need to render as PDF | We recommend a pure-PHP approach rather than one that requires a browser engine on the server, which would add a significant dependency to your production environment |
+| 11 | **see note** | **International and non-GBP customers** | The scope does not say what happens if a customer buys online in a currency other than sterling — whether they earn, at what rate, and what a reward is worth to them | **We are not inventing a rule here.** You have confirmed OSC trades UK-only, which means this does not arise in practice today. If that is permanent we will note it and move on. If OSC may ever sell in another currency, we need a rule for earning and redemption and would build a safeguard before launch |
+| 12 | C16 / Q7 | **Individual voucher records vs one live reward balance** | See the scope point at the end of section 1 | We recommend keeping the live calculated balance, and adjusting the voucher management screen and the member account view to match it |
+
+> **Internal note on two rows above, not for the client.** Both are decisions
+> this document puts to OSC that **`DECISIONS.md` section 3 does not carry**, so
+> they are the exact failure the register exists to prevent — telling Robert
+> something the authoritative list does not say.
+>
+> - **Row 3 (how long a reward code is valid, and what happens to an unused
+>   one).** C13 `CONFIRMED` settles what an expired quote *does*; it does not
+>   record the twenty-minute window itself as a client-confirmed figure. The
+>   window is a constant in `RedemptionService::QUOTE_MINUTES`.
+> - **Row 11 (international and non-GBP customers).** Related to **V24**, but
+>   V24 is a technical validation of ours, not a client decision. There is no C
+>   item asking OSC for an earning and redemption rule outside GBP.
+>
+> **Neither has been given an invented C number.** Adding entries to section 3 is
+> a change to the authoritative register and needs sign-off; until then these two
+> rows are cited as unregistered and must not be presented to OSC as tracked.
 
 ### Information and access we still need
 

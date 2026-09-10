@@ -9,6 +9,21 @@ codebase (`web/app`, `web/routes`, `web/database/migrations`, `web/frontend/src`
 
 **No application code was modified. Nothing was committed or pushed.**
 
+> **This document is not the client-decision register.** The authoritative
+> register is **`DECISIONS.md` section 3, "Plan confirmations"**, with the open
+> questions behind it in section 5 (Q1-Q7). Every C reference below is a
+> *citation* of section 3, not a restatement of it, and where the two disagree,
+> **section 3 wins**. Do not add a new client decision here: add it to section 3
+> and cite it.
+>
+> The reason this note exists: on 10 Sep 2026 this file carried 27 references to
+> C items and `PENDING` while `docs/STATUS_FOR_CLIENT.md` carried none, and an
+> identical duplicate of this file existed as `STATUS_INTERNAL - Copy.md`. Two
+> copies of a fact where one is authoritative and nothing enforces which is how a
+> register stops being a register - the same shape as the four diagnostic
+> failures of 9 Sep 2026, where an instrument was trusted beyond what it could
+> see.
+
 ---
 
 ## How to read this report

@@ -394,6 +394,94 @@ echo App\Models\LedgerEntry::where('entry_type','earn')->latest('id')->first()?-
 
 ---
 
+## E. Refunds, cancellation and D9c's cumulative floor — V25
+
+**Written 10 Sep 2026, before the run, so it is followed rather than
+reconstructed.** One purpose-built order closes three things: **D9c**'s
+cumulative floor, `refunds/create` delivered twice, and `orders/cancelled`.
+
+**Why `#1002` cannot do it.** It has a single line item at quantity 1, so a
+line-item refund of that line is a *full* refund. D9c needs **two partial
+refunds**, which needs a multi-quantity line.
+
+**The one thing that makes this run worthless if got wrong.**
+`OrderSnapshot::refundedQualifyingPence()` counts **only refund line items
+carrying a `line_id`** that matches a qualifying line. An order-level adjustment
+or a bare amount typed into the refund box counts **zero**, and
+`ProcessOrderReversal` returns `nothing_refunded_that_earned` with nothing
+moving — which looks exactly like a delivery failure. **Always refund by setting
+a quantity on the line item.**
+
+### The numbers, chosen deliberately
+
+**3 × £69.99, no discount. Eligible = £209.97 = 20997p, earning 209 points.**
+
+Round numbers cannot demonstrate D9c — £70 × 3 gives 210 points and floors to
+exactly 70 each time, so the cumulative rule and the naive rule agree and the
+test passes without proving anything. These figures are picked so the two rules
+*disagree*.
+
+**The reversal half — this is what demonstrates D9c:**
+
+| | Cumulative rule (ours) | Naive per-refund floor |
+| --- | --- | --- |
+| Refund 1 unit (6999p) | `intdiv(209 × 6999 / 20997)` = **69** | 69 |
+| Refund a 2nd unit (cumulative 13998p) | `intdiv(209 × 13998 / 20997)` = 139, less 69 already = **70** | 69 |
+| **Total reversed** | **139** | **138** |
+
+One point, in the member's favour, which is exactly the case
+`RefundArithmetic`'s docblock describes.
+
+**The restore half — it divides evenly, and that is expected:**
+
+| | Cumulative rule | Naive per-refund floor |
+| --- | --- | --- |
+| Refund 1 unit | `intdiv(1000 × 6999 / 20997)` = **333** | 333 |
+| Refund a 2nd unit | `intdiv(1000 × 13998 / 20997)` = 666, less 333 = **333** | 333 |
+
+**Both rules give 333 twice, so D9c is demonstrated by the REVERSAL half only.**
+The restore half rides along as ordinary D9 proportional-restore coverage.
+Recorded explicitly because a reader who expects the restore side to show the
+one-point difference will read a correct result as a failed demonstration.
+
+### The sequence — seven steps
+
+1. **Product.** A qualifying product at **£69.99** with stock of at least 3,
+   published to the Online Store channel.
+2. **A1 again.** Quote a redemption for **account 10** —
+   `ashish.agrawal@dotsquares.com`, Shopify customer **9671675085040** — and mint
+   a fresh single-use code. The 2 Sep code is spent and its quote long expired,
+   so this cannot be reused.
+3. **A2 again.** Build a cart of **3 × £69.99 = £209.97**, apply the code, and
+   confirm £50 comes off at checkout.
+4. **Pay it.** Confirm `orders/paid` is delivered, the earn posts **209 points
+   pending**, and **1000 available** are consumed. Do not go further until the
+   watermark has moved.
+5. **Refund one unit** — set quantity **1** on the line, not an amount. Expect
+   **reversed 69**, **restored 333**, redemption state unchanged at `confirmed`
+   (D9d: a partial does not flip it).
+6. **Refund a second unit.** Expect **reversed 70** — the D9c point — and
+   **restored 333**. Cumulative reversed reaches 139, not 138.
+7. **Cancel the order.** `orders/cancelled` fires,
+   `OrderSnapshot::isFullyCancelled()` forces a full reversal of the eligible
+   value however the refund records read, and D9d flips the redemption to
+   **`reversed`** with `reversed_at` set.
+
+### What to check after each of steps 4, 5, 6 and 7
+
+```bash
+cd web && php artisan loyalty:preflight
+```
+
+The **watermark** is the evidence, not the admin screen: `webhook_events` must
+gain a row per delivery, `ledger entries` must gain a row per posting, and the
+member balance must move. Also check `loyalty_lot_allocations` for **negative
+release rows** keeping their original expiry (D9a), and the log for
+`voucher.increment_reached` on the refund path — filter on `development.`, since
+`testing.` is the suite and `local.` is artisan.
+
+---
+
 ## What to send back
 
 1. The `codeDiscountNodeByCode` read from **A1** - status, `usageLimit`,
