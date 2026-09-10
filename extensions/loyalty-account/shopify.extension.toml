@@ -1,0 +1,27 @@
+# V11 spike, 10 Sep 2026. Does a customer account UI extension deploy and render
+# under `use_legacy_install_flow = true`?
+#
+# DELIBERATELY MINIMAL AND STATIC. It reads nothing and calls nothing, so a
+# failure can only mean the target does not deploy - not that a scope is missing
+# or a fetch failed. Conflating deployability with data access is what would
+# make this spike answer neither question.
+#
+# Reading the member's real balance additionally needs `customer_read_customers`
+# and a `[customer.metafields.app.*]` declaration with
+# `access.customer_account`, neither of which this app has. That is the SECOND
+# question and is deliberately not asked here.
+
+# Kept in step with ../../shopify.app.toml and web/config/shopify.php.
+api_version = "2026-07"
+
+[[extensions]]
+type = "ui_extension"
+name = "t:name"
+handle = "loyalty-account"
+description = "V11 spike: customer account deployability under the legacy install flow"
+
+# The Profile page is where "My Privilege Club" belongs, so the spike asks the
+# question at the target the real surface would use rather than an easier one.
+[[extensions.targeting]]
+module = "./src/CustomerAccount.jsx"
+target = "customer-account.profile.block.render"

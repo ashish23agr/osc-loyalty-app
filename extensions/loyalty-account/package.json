@@ -1,0 +1,7 @@
+{
+  "name": "loyalty-account",
+  "version": "0.0.1",
+  "license": "UNLICENSED",
+  "type": "module",
+  "private": true
+}
