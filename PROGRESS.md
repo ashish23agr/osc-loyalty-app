@@ -1664,6 +1664,30 @@ V24's fix comes after these three. OSC being UK-only makes it a correctness gap
 rather than a launch gate, and the direction indicated is a server-side check on
 the order rather than another device-reported guard.
 
+### Flagged for 11 September: a Privilege Club clarifications document
+
+Seen on screen 10 Sep 2026 and **not yet read by us.** It carries questions about:
+
+- **partial voucher redemption**;
+- **whether customers choose how much reward to use online**; and
+- **how individually-issued rewards such as birthday vouchers present separately
+  from the accumulated balance.**
+
+**First task is to determine whether these are new questions from Robert or
+restatements of items already in `DECISIONS.md` section 3.** Anything genuinely
+new must be registered there — section 3 is authoritative, and a client question
+answered outside it is the failure the register exists to prevent.
+
+**Candidate mappings, to be CHECKED against the actual document and not assumed:**
+the second looks like **C1 / Q2** (how a customer chooses to redeem online) and
+the third looks like **C16 / Q7** (individual voucher objects against D1's derived
+balance). The first — partial voucher redemption — has no obvious existing home
+and may be genuinely new; it could also be D8's ladder or C1 in different words.
+
+**Do not answer any of them.** They are OSC's business decisions. The task is to
+classify and register, and where an item is new, to record our recommendation
+alongside it in the form the other section 3 entries use.
+
 ### Flagged, unidentified: an admin message worth chasing before it becomes a wall
 
 Shopify's admin displayed **"This feature isn't currently available for your
@@ -1800,6 +1824,38 @@ webhook event and Shopify order. Run it before a device test and again after.
 **If those four numbers are unchanged, the run did not reach the system, whatever
 the device showed.** It is read-only, so it can be run as often as wanted, and it
 does not depend on anyone reading a screen correctly.
+
+### The principle behind the rule — stated 10 Sep 2026
+
+The watermark rule below is a **special case** of something more general, and the
+general form is what will catch the next instance, because the next one will not
+look like either of the two that produced it.
+
+**Wherever a fact exists in two places, something must enforce which one is
+authoritative — and where nothing does, the copy gets trusted.** Every failure of
+9 and 10 September 2026 is an instance:
+
+| The fact | The copy that got trusted | What was missing |
+| --- | --- | --- |
+| The database's state after a device run | A verbal report that it passed | Nothing compared the two — hence the watermark rule |
+| The server's reason for a 403 | The tile's own generic string (V17) | Nothing carried the reason through |
+| The till currency the guard compared | Nothing at all; it was discarded (V23) | Nothing preserved what the decision rested on |
+| What a POS hold would look like | A prediction table, read as an observation | Nothing distinguished forecast from record |
+| Whether a GB location was required | `loyalty:preflight`'s printed verdict | Nothing checked the verdict against its own watermark four lines below |
+| The open client decisions | `STATUS_FOR_CLIENT.md`'s twelve rows, two of which section 3 did not carry | Nothing tied the client document to the register |
+| The internal status review | `STATUS_INTERNAL - Copy.md`, byte-identical | Nothing said which was the original |
+
+**The instances differ; the shape does not.** In each case a second copy of a
+fact existed, nothing enforced which was authoritative, and the copy was believed
+in preference to the thing it was a copy of.
+
+**So the remedy is structural, not vigilance.** A copy is acceptable when
+something enforces the hierarchy: a `Ref` column that ties a client document to
+the register, a watermark that a report can be checked against, an environment
+prefix that separates a test's log line from a device's, a log entry that
+preserves what a guard compared. **Where a copy cannot be tied back, it should not
+exist** — which is why the duplicate status file was deleted rather than
+annotated.
 
 ### The rule
 

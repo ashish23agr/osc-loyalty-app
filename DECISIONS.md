@@ -2582,6 +2582,27 @@ Three gaps the review found that were **real and untracked**: none had a
 validation number, and two of them are the reason several modules cannot be
 called verified.
 
+**Attempt 1 on V25 failed for a named cause, 10 Sep 2026: the refund was not
+completed in the admin.** Recorded rather than left unexplained, because three of
+the four failed real-surface attempts across 9-10 Sep now have named causes and
+an unexplained fourth invites the whole thing being re-investigated later.
+
+Everything downstream was confirmed working *before* the attempt: all six
+subscriptions on the live tunnel with no `[stale]` marker, the tunnel leg
+returning HTTP 200, a Shopify-signed sample `products/update` accepted by the
+handler, and an empty queue with zero failures. Afterwards **Shopify itself held
+no refund** — `#1002` read `PAID`, `refunded=0.0`, `refund count = 0` — which is
+independent of this app entirely. The order was refundable in principle:
+`test=true`, gateway `bogus`, `AUTHORIZATION` and `CAPTURE` both `SUCCESS` at
+£550, not cancelled, not closed.
+
+So the cause is **upstream of anything we built**, in the admin, and the four
+attempts are two causes rather than one: **three POS tenders failed because the
+device was offline (C7)**, and **this refund failed because it was never
+submitted**. Neither is a defect in this codebase. What they share is that each
+was reported complete before the watermark was checked — see the principle
+recorded in `PROGRESS.md`.
+
 **V25 — no real refund or cancellation has ever been processed.** `refunds/create`
 and `orders/cancelled` have never been delivered to this app; the newest
 `webhook_events` row is an `orders/paid` from 2 Sep 12:54:37. D9's proportional
