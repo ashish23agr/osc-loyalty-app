@@ -21,7 +21,7 @@
  * release.** That is on the go-live checklist next to the same requirement for
  * `application_url` in `shopify.app.toml`, which this deliberately mirrors.
  */
-export const APP_URL = 'https://arrive-weddings-setting-graham.trycloudflare.com';
+export const APP_URL = 'https://season-sensitive-stuck-fin.trycloudflare.com';
 
 /**
  * The base URL for this run, preferring anything the host offers.

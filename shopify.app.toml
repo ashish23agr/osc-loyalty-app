@@ -9,7 +9,7 @@ client_id = "9b28cadf317aed92cad0ce1ed836f1c4"
 # complete. A tunnel URL is ephemeral - re-deploy after a tunnel change,
 # and replace both this and redirect_urls with the production URL before
 # go-live. See "Dev notes" in README.md.
-application_url = "https://arrive-weddings-setting-graham.trycloudflare.com"
+application_url = "https://which-using-shaw-essays.trycloudflare.com"
 embedded = true
 
 [build]
@@ -24,9 +24,9 @@ use_legacy_install_flow = true
 
 [auth]
 redirect_urls = [
-  "https://arrive-weddings-setting-graham.trycloudflare.com/api/auth/callback",
-  "https://arrive-weddings-setting-graham.trycloudflare.com/auth/callback",
-  "https://arrive-weddings-setting-graham.trycloudflare.com/auth/shopify/callback",
+  "https://which-using-shaw-essays.trycloudflare.com/api/auth/callback",
+  "https://which-using-shaw-essays.trycloudflare.com/auth/callback",
+  "https://which-using-shaw-essays.trycloudflare.com/auth/shopify/callback",
 ]
 
 [webhooks]
